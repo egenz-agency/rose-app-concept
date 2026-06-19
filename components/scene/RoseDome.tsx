@@ -93,25 +93,28 @@ export function RoseDome({ onDomePointerDown, onDomePointerUp }: RoseDomeProps) 
         // so you see THROUGH to the rose; the bright scene lights create sharp
         // glassy specular highlights that read as real glass. Low env so the night
         // sky reflection never washes it out.
-        // Near-zero refraction (ior ~1.0, almost no thickness) so the curved glass
-        // does NOT bend light and create a ghost / double image of the rose — you
-        // see the rose straight through, as it is. Minimal reflections/specular so
-        // there is no glare on the surface. A faint dark attenuation + a whisper of
-        // reflection keep it reading as clean, clear glass.
+        // Real-glass look like the Blender model: a glossy CLEARCOAT layer plus
+        // strong, sharp environment reflections give the surface true glass
+        // character (reflections, Fresnel rim, highlights). The base ior is kept
+        // LOW so transmission doesn't bend light through the curved shell and
+        // re-create the ghost / double image — the clearcoat (its own ior ~1.5)
+        // provides the glassy reflections without any refraction doubling.
         const glassMat = new THREE.MeshPhysicalMaterial({
           transmission:        1.0,
-          thickness:           0.35,
+          thickness:           0.3,
           roughness:           0.0,
-          ior:                 1.03,
+          ior:                 1.1,
           color:               new THREE.Color("#ffffff"),
           attenuationColor:    new THREE.Color("#0c0610"),
-          attenuationDistance: 1.1,
-          envMapIntensity:     0.06,
+          attenuationDistance: 1.2,
+          envMapIntensity:     0.9,
+          clearcoat:           1.0,
+          clearcoatRoughness:  0.0,
           transparent:         true,
           opacity:             DOME_OPACITY,
           metalness:           0.0,
-          reflectivity:        0.08,
-          specularIntensity:   0.22,
+          reflectivity:        0.55,
+          specularIntensity:   1.0,
           specularColor:       new THREE.Color("#ffffff"),
           side:                THREE.FrontSide,
         })

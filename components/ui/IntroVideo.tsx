@@ -122,6 +122,21 @@ export function IntroVideo() {
     setIsMuted(!isMuted)
   }
 
+  // Open the video in fullscreen so she can rotate the phone and watch it
+  // landscape. iOS Safari needs the video element's own webkitEnterFullscreen.
+  const goFullscreen = () => {
+    const vid = videoRef.current as
+      | (HTMLVideoElement & {
+          webkitEnterFullscreen?: () => void
+          webkitRequestFullscreen?: () => void
+        })
+      | null
+    if (!vid) return
+    if (vid.requestFullscreen) vid.requestFullscreen().catch(() => {})
+    else if (vid.webkitEnterFullscreen) vid.webkitEnterFullscreen() // iOS
+    else if (vid.webkitRequestFullscreen) vid.webkitRequestFullscreen()
+  }
+
   if (phase !== "VIDEO") return null
 
   return (
@@ -145,6 +160,7 @@ export function IntroVideo() {
               src={videoSrc}
               playsInline
               onEnded={handleVideoEnd}
+              onClick={goFullscreen}
               onCanPlay={(e) => {
                 // Keep trying to play WITH sound the moment the data is ready.
                 const v = e.currentTarget
@@ -153,7 +169,7 @@ export function IntroVideo() {
                   v.play().catch(() => {})
                 }
               }}
-              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", cursor: "pointer" }}
             />
           )}
           {/* Cinematic gradient edges */}
@@ -189,6 +205,26 @@ export function IntroVideo() {
             <span>{isMuted ? "Unmute" : "Mute"}</span>
           </motion.button>
 
+          <motion.button
+            onClick={goFullscreen}
+            className="flex items-center gap-2 px-4 py-2 rounded-full text-sm"
+            style={{
+              background: "rgba(201,168,76,0.1)",
+              border: "1px solid rgba(201,168,76,0.2)",
+              color: "#c9a84c",
+              fontFamily: "'Cormorant Garamond', serif",
+              letterSpacing: "0.1em",
+              cursor: "pointer",
+            }}
+            whileHover={{ scale: 1.02, background: "rgba(201,168,76,0.15)" }}
+            whileTap={{ scale: 0.98 }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0, transition: { delay: 1.1 } }}
+          >
+            <ExpandIcon />
+            <span>Fullscreen</span>
+          </motion.button>
+
           <AnimatePresence>
             {showSkip && (
               <motion.button
@@ -215,6 +251,17 @@ export function IntroVideo() {
         </div>
       </motion.div>
     </AnimatePresence>
+  )
+}
+
+function ExpandIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+      <path d="M16 3h3a2 2 0 0 1 2 2v3" />
+      <path d="M8 21H5a2 2 0 0 1-2-2v-3" />
+      <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+    </svg>
   )
 }
 

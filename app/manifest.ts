@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "The Enchanted Rose",
-    short_name: "The Rose",
+    name: "Stella's Rose",
+    short_name: "Stella's Rose",
     description: "A magical living rose — care for it every day and watch it grow.",
     start_url: "/",
     scope: "/",

@@ -6,10 +6,10 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || "https://the-enchanted-rose.vercel.app"),
   title: "The Enchanted Rose",
   description: "A magical living rose — care for it every day and watch it grow.",
-  applicationName: "The Enchanted Rose",
+  applicationName: "Stella's Rose",
   appleWebApp: {
     capable: true,
-    title: "The Rose",
+    title: "Stella's Rose",
     statusBarStyle: "black-translucent",
   },
   icons: {
