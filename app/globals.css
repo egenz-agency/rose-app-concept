@@ -1,26 +1,149 @@
 @import "tailwindcss";
 
+/* ─── Design Tokens ──────────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Prompt-spec colors */
+  --color-bg:               #0a0205;
+  --color-rose-alive:       #cc0044;
+  --color-rose-glow:        #8b0030;
+  --color-rose-dead:        #1a0005;
+  --color-gold:             #c9a84c;
+  --color-star:             rgba(245, 240, 232, 0.6);
+  --color-constellation:    rgba(201, 168, 76, 0.25);
+  --color-leaf:             #1a4a10;
+  --color-warm-lift:        #ff3355;
+
+  /* Legacy aliases kept for backward compat */
+  --bg:          #0a0205;
+  --bg-surface:  rgba(248, 240, 228, 0.035);
+  --bg-hover:    rgba(248, 240, 228, 0.06);
+  --gold:        #c9a84c;
+  --gold-dim:    rgba(201, 168, 76, 0.18);
+  --gold-glow:   rgba(201, 168, 76, 0.08);
+  --crimson:     #8b0030;
+  --crimson-dim: rgba(139, 0, 48, 0.22);
+  --rose-glow:   rgba(204, 0, 68, 0.35);
+  --ivory:       #f2ece0;
+  --ivory-dim:   rgba(242, 236, 224, 0.55);
+  --ivory-ghost: rgba(242, 236, 224, 0.25);
+  --border:      rgba(201, 168, 76, 0.14);
+  --border-soft: rgba(248, 240, 228, 0.06);
+  --radius-xl:   28px;
+  --radius-lg:   18px;
+  --radius-md:   12px;
+  --radius-sm:   8px;
+
+  /* Glass surface */
+  --glass-bg:      rgba(10, 2, 5, 0.80);
+  --glass-border:  rgba(201, 168, 76, 0.16);
+  --glass-inner:   rgba(255, 248, 240, 0.04);
+  --glass-shine:   inset 0 1px 0 rgba(255, 248, 240, 0.08);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--bg);
+  color: var(--ivory);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'EB Garamond', 'Cormorant Garamond', Georgia, serif;
+  font-size: 17px;
+  line-height: 1.6;
+  background: var(--bg);
+  overflow: hidden;
+  height: 100dvh;
+  width: 100vw;
 }
+
+/* ─── Film Grain (fixed, zero GPU cost) ─────────────────────── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.022;
+  animation: grain 10s steps(10) infinite;
+}
+@keyframes grain {
+  0%,100%{transform:translate(0,0)} 10%{transform:translate(-2%,-3%)}
+  20%{transform:translate(3%,2%)} 30%{transform:translate(-1%,4%)}
+  40%{transform:translate(4%,-1%)} 50%{transform:translate(-3%,3%)}
+  60%{transform:translate(2%,-4%)} 70%{transform:translate(-4%,1%)}
+  80%{transform:translate(1%,-2%)} 90%{transform:translate(3%,4%)}
+}
+
+/* ─── Typography Scale ───────────────────────────────────────── */
+.t-display {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-style: italic;
+  font-weight: 300;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  color: var(--ivory);
+}
+.t-serif {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-weight: 400;
+  line-height: 1.65;
+  color: var(--ivory-dim);
+}
+.t-label {
+  font-family: 'EB Garamond', Georgia, serif;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--gold);
+  opacity: 0.7;
+}
+.t-stat {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-variant-numeric: tabular-nums;
+  font-weight: 300;
+  letter-spacing: 0.02em;
+}
+
+/* ─── Glass Panel ────────────────────────────────────────────── */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shine), 0 24px 48px rgba(0, 0, 0, 0.5);
+}
+
+/* Glass with gold outer ring (double-bezel) */
+.glass-bezel {
+  background: linear-gradient(135deg, rgba(184,148,74,0.22) 0%, rgba(138,21,40,0.10) 60%, rgba(184,148,74,0.06) 100%);
+  padding: 1px;
+}
+.glass-bezel-inner {
+  background: var(--glass-bg);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  box-shadow: var(--glass-shine), 0 32px 64px rgba(0,0,0,0.55);
+}
+
+/* ─── Glow effects ───────────────────────────────────────────── */
+.glow-crimson {
+  text-shadow: 0 0 28px rgba(200, 40, 60, 0.45), 0 0 60px rgba(138, 21, 40, 0.2);
+}
+.glow-gold {
+  text-shadow: 0 0 24px rgba(184, 148, 74, 0.5), 0 0 56px rgba(184, 148, 74, 0.18);
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--gold-dim); border-radius: 2px; }
+::selection { background: rgba(138, 21, 40, 0.38); color: var(--ivory); }
+
+/* ─── Custom utilities not generated by Tailwind ─────────────── */
+.z-25 { z-index: 25; }
