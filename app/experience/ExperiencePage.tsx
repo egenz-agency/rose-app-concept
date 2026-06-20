@@ -190,16 +190,17 @@ function ExperienceInner() {
 function IdleHint() {
   return (
     <div
-      className="fixed bottom-6 left-1/2 pointer-events-none z-20"
+      className="fixed bottom-9 left-1/2 pointer-events-none z-20"
       style={{ transform: "translateX(-50%)" }}
     >
       <p
         style={{
           fontFamily: "'Cormorant Garamond', Georgia, serif",
-          fontSize: "11px",
-          letterSpacing: "0.24em",
-          color: "rgba(184, 148, 74, 0.38)",
+          fontSize: "15px",
+          letterSpacing: "0.26em",
+          color: "rgba(232, 200, 130, 0.95)",
           textTransform: "uppercase",
+          textShadow: "0 0 14px rgba(201,168,76,0.6), 0 0 4px rgba(0,0,0,0.6)",
           animation: "softpulse 3.5s ease-in-out infinite",
         }}
       >
@@ -207,8 +208,8 @@ function IdleHint() {
       </p>
       <style>{`
         @keyframes softpulse {
-          0%, 100% { opacity: 0.25; }
-          50%       { opacity: 0.85; }
+          0%, 100% { opacity: 0.7; }
+          50%       { opacity: 1; }
         }
       `}</style>
     </div>

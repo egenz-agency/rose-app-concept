@@ -1,7 +1,7 @@
 "use client"
 import { useRef, useMemo, type MutableRefObject } from "react"
 import { useFrame } from "@react-three/fiber"
-import { Sphere, Billboard, Text } from "@react-three/drei"
+import { Sphere } from "@react-three/drei"
 import * as THREE from "three"
 import { useQuery } from "@tanstack/react-query"
 import { fetchMemoryStars } from "@/lib/supabase/queries"
@@ -88,19 +88,6 @@ function MemoryStar({
           metalness={0.8}
         />
       </Sphere>
-      <Billboard>
-        <Text
-          position={[0, 0.13, 0]}
-          fontSize={0.065}
-          color="#f5f0e8"
-          fillOpacity={0.7}
-          anchorX="center"
-          anchorY="bottom"
-          font="/fonts/Cormorant-Italic.woff"
-        >
-          {star.title}
-        </Text>
-      </Billboard>
       <pointLight color="#c9a84c" intensity={0.4} distance={1.2} decay={2} />
     </group>
   )
@@ -128,19 +115,6 @@ function EmptyStar() {
           opacity={0.35}
         />
       </Sphere>
-      <Billboard>
-        <Text
-          position={[0, 0.1, 0]}
-          fontSize={0.06}
-          color="#f5f0e8"
-          fillOpacity={0.25}
-          anchorX="center"
-          anchorY="bottom"
-          font="/fonts/Cormorant-Italic.woff"
-        >
-          Waiting for your first memory.
-        </Text>
-      </Billboard>
     </group>
   )
 }

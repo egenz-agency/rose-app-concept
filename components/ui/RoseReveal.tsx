@@ -103,9 +103,9 @@ export function RoseReveal() {
                 style={{
                   position: "absolute",
                   bottom: "14%",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  width: "100%",
+                  left: 0,
+                  right: 0,
+                  margin: "0 auto",
                   fontSize: "clamp(22px, 4.5vw, 38px)",
                   fontStyle: "italic",
                   color: "rgba(242, 236, 224, 0.88)",

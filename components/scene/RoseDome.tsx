@@ -18,7 +18,6 @@ const SCENE_SCALE  = 5.0
 // Derived from GLB dome dimensions × SCENE_SCALE (0.299 m radius, 0.423 m tall)
 const DOME_RADIUS  = 0.299 * SCENE_SCALE  // ≈ 1.495 world units
 const DOME_HEIGHT  = 0.423 * SCENE_SCALE  // ≈ 2.115 world units
-const DOME_OPACITY = 1.0   // transmission provides see-through; dark attenuation keeps it clear
 // Lift distance in GLTF local units (world units / SCENE_SCALE)
 const DOME_LIFT_LOCAL = 3.5 / SCENE_SCALE
 
@@ -31,6 +30,7 @@ export function RoseDome({ onDomePointerDown, onDomePointerUp }: RoseDomeProps) 
   const innerLightRef = useRef<THREE.PointLight>(null)
   const domeInitY     = useRef(0)
   const domePosY      = useRef({ y: 0 })
+  const domeRestOpacity = useRef(1)   // the model glass's native opacity (lift fades to 0 and back to this)
 
   const phase           = useSceneStore((s) => s.phase)
   const rose            = useSceneStore((s) => s.rose)
@@ -83,46 +83,20 @@ export function RoseDome({ onDomePointerDown, onDomePointerUp }: RoseDomeProps) 
         roseBaseScale.current.copy(child.scale)   // remember full-bloom scale
 
       } else if (name.includes("glass")) {
-        // Clear, physically-based glass. FrontSide is important: the camera
-        // dives INSIDE the dome during the reveal, and FrontSide culls the far
-        // wall so the rose stays clearly visible instead of being washed out by
-        // a bright back surface. Gentle reflections (no clearcoat / low env) so
-        // postprocessing bloom doesn't blow the glass to white.
-        // Clear, mirror-smooth glass. roughness 0 → crisp (not matte). A dark
-        // attenuation keeps the body from washing milky-grey from the environment,
-        // so you see THROUGH to the rose; the bright scene lights create sharp
-        // glassy specular highlights that read as real glass. Low env so the night
-        // sky reflection never washes it out.
-        // Real-glass look like the Blender model: a glossy CLEARCOAT layer plus
-        // strong, sharp environment reflections give the surface true glass
-        // character (reflections, Fresnel rim, highlights). The base ior is kept
-        // LOW so transmission doesn't bend light through the curved shell and
-        // re-create the ghost / double image — the clearcoat (its own ior ~1.5)
-        // provides the glassy reflections without any refraction doubling.
-        const glassMat = new THREE.MeshPhysicalMaterial({
-          transmission:        1.0,
-          thickness:           0.3,
-          roughness:           0.0,
-          ior:                 1.1,
-          color:               new THREE.Color("#ffffff"),
-          attenuationColor:    new THREE.Color("#0c0610"),
-          attenuationDistance: 1.2,
-          envMapIntensity:     0.9,
-          clearcoat:           1.0,
-          clearcoatRoughness:  0.0,
-          transparent:         true,
-          opacity:             DOME_OPACITY,
-          metalness:           0.0,
-          reflectivity:        0.55,
-          specularIntensity:   1.0,
-          specularColor:       new THREE.Color("#ffffff"),
-          side:                THREE.FrontSide,
-        })
-        child.material       = glassMat
-        domeMatRef.current   = glassMat
-        domeMeshRef.current  = child
-        domeInitY.current    = child.position.y
-        domePosY.current.y   = child.position.y
+        // Use the ORIGINAL glass material straight from the model (the Blender
+        // glass dome) — no custom override. We only make it fadeable for the
+        // dome-lift animation and force FrontSide so the camera's inside-the-dome
+        // reveal isn't washed out by the far wall. Its native look is preserved.
+        const mat = rawMat as THREE.MeshPhysicalMaterial
+        mat.transparent  = true
+        mat.depthWrite   = false
+        mat.side         = THREE.FrontSide
+        mat.needsUpdate  = true
+        domeMatRef.current      = mat
+        domeRestOpacity.current = mat.opacity
+        domeMeshRef.current     = child
+        domeInitY.current       = child.position.y
+        domePosY.current.y      = child.position.y
       }
     })
   }, [clonedScene])
@@ -162,7 +136,7 @@ export function RoseDome({ onDomePointerDown, onDomePointerUp }: RoseDomeProps) 
         duration: 1.0, ease: "power3.inOut",
         onUpdate: () => { domeMesh.position.y = domePosY.current.y },
       })
-      gsap.to(domeMat, { opacity: DOME_OPACITY, duration: 0.8, ease: "power2.in" })
+      gsap.to(domeMat, { opacity: domeRestOpacity.current, duration: 0.8, ease: "power2.in" })
       if (innerLightRef.current) {
         gsap.to(innerLightRef.current, { intensity: 2.5, duration: 1.0 })
       }

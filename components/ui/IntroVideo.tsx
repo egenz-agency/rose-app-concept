@@ -9,32 +9,24 @@ const MUSIC_VOLUME_TARGET = 0.45
 export function IntroVideo() {
   const phase    = useSceneStore((s) => s.phase)
   const setPhase = useSceneStore((s) => s.setPhase)
-  const [isMuted,   setIsMuted]   = useState(false)
-  const [showSkip,  setShowSkip]  = useState(false)
-  const [videoSrc,  setVideoSrc]  = useState<string | null>(null)
+  const [isMuted,  setIsMuted]  = useState(true)        // start muted → guaranteed autoplay on mobile
+  const [showSkip, setShowSkip] = useState(false)
+  const [videoSrc, setVideoSrc] = useState<string>("/intro.mp4") // never null
   const videoRef  = useRef<HTMLVideoElement>(null)
   const musicRef  = useRef<HTMLAudioElement | null>(null)
 
-  // Start background music loop when the video ends (phase leaves VIDEO)
+  // Start background music loop once the video is done (phase leaves VIDEO)
   useEffect(() => {
     if (phase === "VIDEO") return
-    if (musicRef.current) return // already started
-
+    if (musicRef.current) return
     const audio = new Audio("/audio/background_music.mp3")
     audio.loop = true
     audio.volume = 0
     musicRef.current = audio
-
     audio.play().catch(() => {
-      // Autoplay blocked — will start on next user interaction
-      const unlock = () => {
-        audio.play().catch(() => {})
-        window.removeEventListener("pointerdown", unlock)
-      }
+      const unlock = () => { audio.play().catch(() => {}); window.removeEventListener("pointerdown", unlock) }
       window.addEventListener("pointerdown", unlock)
     })
-
-    // Fade in over 4 seconds
     let vol = 0
     const step = MUSIC_VOLUME_TARGET / 80
     const fade = setInterval(() => {
@@ -42,102 +34,98 @@ export function IntroVideo() {
       audio.volume = vol
       if (vol >= MUSIC_VOLUME_TARGET) clearInterval(fade)
     }, 50)
-
     return () => clearInterval(fade)
   }, [phase])
 
-  // Determine which video to play: /intro.mp4 on first ever visit,
-  // latest from daily_videos table on subsequent visits
+  // On return visits, swap in the latest daily video if one exists.
   useEffect(() => {
     if (phase !== "VIDEO") return
-
     const isFirstEver = !localStorage.getItem(FIRST_VISIT_KEY)
     if (isFirstEver) {
-      setVideoSrc("/intro.mp4")
       localStorage.setItem(FIRST_VISIT_KEY, "1")
-      return
+      return // keep default /intro.mp4
     }
-
-    // Try to fetch latest daily video from Supabase
     import("@/lib/supabase/client").then(({ getSupabaseClient }) => {
-      const sb = getSupabaseClient()
-      sb.from("daily_videos")
-        .select("video_url")
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single()
-        .then(({ data, error }) => {
-          if (error || !data) setVideoSrc("/intro.mp4")
-          else setVideoSrc(data.video_url ?? "/intro.mp4")
-        })
-    })
+      try {
+        const sb = getSupabaseClient()
+        sb.from("daily_videos")
+          .select("video_url").eq("is_active", true)
+          .order("created_at", { ascending: false }).limit(1).single()
+          .then(({ data }) => { if (data?.video_url) setVideoSrc(data.video_url) })
+      } catch { /* keep default */ }
+    }).catch(() => {})
   }, [phase])
 
+  // Play handling: muted autoplay always works; then try to unmute (the
+  // Preloader "tap to begin" gesture usually still counts), and unmute on the
+  // first tap as a fallback.
   useEffect(() => {
-    if (phase !== "VIDEO" || !videoSrc) return
-    const skipTimer = setTimeout(() => setShowSkip(true), 3000)
-
+    if (phase !== "VIDEO") return
     const vid = videoRef.current
-    if (!vid) return () => clearTimeout(skipTimer)
+    if (!vid) return
 
-    let removeUnlock: (() => void) | null = null
+    vid.muted = true
+    vid.play().catch(() => {})
 
-    // Try to play WITH sound first (ideal — Preloader click is a user gesture).
-    vid.muted = false
-    setIsMuted(false)
-    vid.play().catch(() => {
-      // Browser blocked unmuted autoplay. Fall back to MUTED autoplay so the
-      // video always plays visibly, then unmute on the very first interaction.
-      vid.muted = true
-      setIsMuted(true)
-      vid.play().catch(() => {})
+    // Best-effort immediate unmute (carries the recent tap gesture)
+    const tryUnmute = () => {
+      if (!videoRef.current) return
+      videoRef.current.muted = false
+      videoRef.current.play()
+        .then(() => setIsMuted(false))
+        .catch(() => {
+          if (!videoRef.current) return
+          videoRef.current.muted = true
+          setIsMuted(true)
+          videoRef.current.play().catch(() => {})
+        })
+    }
+    tryUnmute()
 
-      const unlock = () => {
-        if (!videoRef.current) return
-        videoRef.current.muted = false
-        setIsMuted(false)
-        videoRef.current.play().catch(() => {})
-        removeUnlock?.()
-      }
-      window.addEventListener("pointerdown", unlock, { once: true })
-      window.addEventListener("keydown", unlock, { once: true })
-      removeUnlock = () => {
-        window.removeEventListener("pointerdown", unlock)
-        window.removeEventListener("keydown", unlock)
-      }
-    })
+    const unlock = () => { tryUnmute() }
+    window.addEventListener("pointerdown", unlock, { once: true })
 
+    const skipTimer = setTimeout(() => setShowSkip(true), 1500)
     return () => {
       clearTimeout(skipTimer)
-      removeUnlock?.()
+      window.removeEventListener("pointerdown", unlock)
     }
   }, [phase, videoSrc])
 
   const handleVideoEnd = () => setPhase("INTRO_ANIMATION")
 
   const toggleMute = () => {
-    if (!videoRef.current) return
-    videoRef.current.muted = !isMuted
-    setIsMuted(!isMuted)
+    const v = videoRef.current
+    if (!v) return
+    v.muted = !v.muted
+    setIsMuted(v.muted)
+    v.play().catch(() => {})
   }
 
-  // Open the video in fullscreen so she can rotate the phone and watch it
-  // landscape. iOS Safari needs the video element's own webkitEnterFullscreen.
+  // Fullscreen so she can rotate the phone and watch it landscape.
   const goFullscreen = () => {
     const vid = videoRef.current as
-      | (HTMLVideoElement & {
-          webkitEnterFullscreen?: () => void
-          webkitRequestFullscreen?: () => void
-        })
+      | (HTMLVideoElement & { webkitEnterFullscreen?: () => void; webkitRequestFullscreen?: () => void })
       | null
     if (!vid) return
     if (vid.requestFullscreen) vid.requestFullscreen().catch(() => {})
-    else if (vid.webkitEnterFullscreen) vid.webkitEnterFullscreen() // iOS
+    else if (vid.webkitEnterFullscreen) vid.webkitEnterFullscreen()
     else if (vid.webkitRequestFullscreen) vid.webkitRequestFullscreen()
   }
 
   if (phase !== "VIDEO") return null
+
+  const btnStyle: React.CSSProperties = {
+    display: "flex", alignItems: "center", gap: 8,
+    minHeight: 46, padding: "10px 18px", borderRadius: 999,
+    background: "rgba(201,168,76,0.12)",
+    border: "1px solid rgba(201,168,76,0.3)",
+    color: "#c9a84c",
+    fontFamily: "'Cormorant Garamond', serif",
+    fontSize: 15, letterSpacing: "0.08em",
+    cursor: "pointer", WebkitTapHighlightColor: "transparent",
+    touchAction: "manipulation", pointerEvents: "auto",
+  }
 
   return (
     <AnimatePresence>
@@ -148,106 +136,61 @@ export function IntroVideo() {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0, transition: { duration: 1.5, ease: [0.32, 0.72, 0, 1] } }}
       >
-        {/* Letterbox bars */}
-        <div className="fixed top-0 left-0 right-0 h-[8vh] z-20" style={{ background: "#0a0205" }} />
-        <div className="fixed bottom-0 left-0 right-0 h-[8vh] z-20" style={{ background: "#0a0205" }} />
+        {/* Letterbox bars (behind controls) */}
+        <div className="fixed top-0 left-0 right-0 h-[6vh] z-20 pointer-events-none" style={{ background: "#0a0205" }} />
+        <div className="fixed bottom-0 left-0 right-0 h-[6vh] z-20 pointer-events-none" style={{ background: "#0a0205" }} />
 
-        {/* Video — 80% width, 16:9 */}
-        <div className="relative overflow-hidden" style={{ width: "80%", aspectRatio: "16/9" }}>
-          {videoSrc && (
-            <video
-              ref={videoRef}
-              src={videoSrc}
-              playsInline
-              onEnded={handleVideoEnd}
-              onClick={goFullscreen}
-              onCanPlay={(e) => {
-                // Keep trying to play WITH sound the moment the data is ready.
-                const v = e.currentTarget
-                if (v.paused) {
-                  v.muted = false
-                  v.play().catch(() => {})
-                }
-              }}
-              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", cursor: "pointer" }}
-            />
-          )}
-          {/* Cinematic gradient edges */}
-          <div className="absolute inset-x-0 top-0 h-24 pointer-events-none z-10"
-            style={{ background: "linear-gradient(to bottom, #0a0205, transparent)" }} />
-          <div className="absolute inset-x-0 bottom-0 h-24 pointer-events-none z-10"
-            style={{ background: "linear-gradient(to top, #0a0205, transparent)" }} />
-          <div className="absolute inset-y-0 left-0 w-24 pointer-events-none z-10"
-            style={{ background: "linear-gradient(to right, #0a0205, transparent)" }} />
-          <div className="absolute inset-y-0 right-0 w-24 pointer-events-none z-10"
-            style={{ background: "linear-gradient(to left, #0a0205, transparent)" }} />
+        {/* Video — tap it for fullscreen + sound */}
+        <div className="relative overflow-hidden" style={{ width: "92%", maxWidth: 900, aspectRatio: "16/9" }}>
+          <video
+            ref={videoRef}
+            src={videoSrc}
+            autoPlay
+            muted
+            playsInline
+            preload="auto"
+            onEnded={handleVideoEnd}
+            onClick={goFullscreen}
+            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", cursor: "pointer" }}
+          />
+          <div className="absolute inset-x-0 top-0 h-16 pointer-events-none z-10" style={{ background: "linear-gradient(to bottom, #0a0205, transparent)" }} />
+          <div className="absolute inset-x-0 bottom-0 h-16 pointer-events-none z-10" style={{ background: "linear-gradient(to top, #0a0205, transparent)" }} />
         </div>
 
-        {/* Controls */}
-        <div className="relative z-30 flex items-center gap-6 mt-8">
-          <motion.button
-            onClick={toggleMute}
-            className="flex items-center gap-2 px-4 py-2 rounded-full text-sm"
-            style={{
-              background: "rgba(201,168,76,0.1)",
-              border: "1px solid rgba(201,168,76,0.2)",
-              color: "#c9a84c",
-              fontFamily: "'Cormorant Garamond', serif",
-              letterSpacing: "0.1em",
-              cursor: "pointer",
-            }}
-            whileHover={{ scale: 1.02, background: "rgba(201,168,76,0.15)" }}
-            whileTap={{ scale: 0.98 }}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0, transition: { delay: 1 } }}
-          >
+        {/* Controls — fixed bottom bar, above everything, safe-area aware */}
+        <div
+          style={{
+            position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 60,
+            display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: 14,
+            padding: "14px 16px calc(14px + env(safe-area-inset-bottom, 0px))",
+            pointerEvents: "auto",
+          }}
+        >
+          <button type="button" onClick={toggleMute} style={btnStyle}>
             {isMuted ? <SoundOffIcon /> : <SoundOnIcon />}
-            <span>{isMuted ? "Unmute" : "Mute"}</span>
-          </motion.button>
+            <span>{isMuted ? "Tap for sound" : "Mute"}</span>
+          </button>
 
-          <motion.button
-            onClick={goFullscreen}
-            className="flex items-center gap-2 px-4 py-2 rounded-full text-sm"
-            style={{
-              background: "rgba(201,168,76,0.1)",
-              border: "1px solid rgba(201,168,76,0.2)",
-              color: "#c9a84c",
-              fontFamily: "'Cormorant Garamond', serif",
-              letterSpacing: "0.1em",
-              cursor: "pointer",
-            }}
-            whileHover={{ scale: 1.02, background: "rgba(201,168,76,0.15)" }}
-            whileTap={{ scale: 0.98 }}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0, transition: { delay: 1.1 } }}
-          >
+          <button type="button" onClick={goFullscreen} style={btnStyle}>
             <ExpandIcon />
             <span>Fullscreen</span>
-          </motion.button>
+          </button>
 
-          <AnimatePresence>
-            {showSkip && (
-              <motion.button
-                onClick={handleVideoEnd}
-                style={{
-                  color: "rgba(245,240,232,0.4)",
-                  fontFamily: "'Cormorant Garamond', serif",
-                  letterSpacing: "0.15em",
-                  textTransform: "uppercase",
-                  fontSize: "11px",
-                  border: "none",
-                  background: "none",
-                  cursor: "pointer",
-                }}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                whileHover={{ color: "rgba(245,240,232,0.8)" }}
-              >
-                Skip intro
-              </motion.button>
-            )}
-          </AnimatePresence>
+          <button
+            type="button"
+            onClick={handleVideoEnd}
+            style={{
+              ...btnStyle,
+              background: "transparent",
+              border: "1px solid rgba(245,240,232,0.18)",
+              color: "rgba(245,240,232,0.65)",
+              textTransform: "uppercase",
+              fontSize: 12, letterSpacing: "0.16em",
+              opacity: showSkip ? 1 : 0.6,
+            }}
+          >
+            Skip intro
+          </button>
         </div>
       </motion.div>
     </AnimatePresence>
@@ -256,18 +199,16 @@ export function IntroVideo() {
 
 function ExpandIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M8 3H5a2 2 0 0 0-2 2v3" />
-      <path d="M16 3h3a2 2 0 0 1 2 2v3" />
-      <path d="M8 21H5a2 2 0 0 1-2-2v-3" />
-      <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 3H5a2 2 0 0 0-2 2v3" /><path d="M16 3h3a2 2 0 0 1 2 2v3" />
+      <path d="M8 21H5a2 2 0 0 1-2-2v-3" /><path d="M16 21h3a2 2 0 0 0 2-2v-3" />
     </svg>
   )
 }
 
 function SoundOffIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
       <line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" />
     </svg>
@@ -276,10 +217,9 @@ function SoundOffIcon() {
 
 function SoundOnIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
       <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-      <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
     </svg>
   )
 }
