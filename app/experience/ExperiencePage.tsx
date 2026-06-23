@@ -14,6 +14,7 @@ import { MemoryStarPanel } from "@/components/ui/MemoryStarPanel"
 import { NavigationHUD } from "@/components/ui/NavigationHUD"
 import { GrowthSimulator } from "@/components/ui/GrowthSimulator"
 import { MissedDayPreview } from "@/components/ui/MissedDayPreview"
+import { MomentPanel } from "@/components/ui/MomentPanel"
 import { HoldRing } from "@/components/ui/HoldRing"
 import { ViewControls } from "@/components/ui/ViewControls"
 import { SceneErrorBoundary } from "@/components/scene/SceneErrorBoundary"
@@ -174,6 +175,7 @@ function ExperienceInner() {
       <NavigationHUD />
       <InstructionsPanel />
       <CarePanel />
+      <MomentPanel />
       <RevivalPanel />
       <FinalDeathScene />
       <LettersPanel />

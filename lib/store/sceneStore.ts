@@ -2,6 +2,7 @@
 import { create } from "zustand"
 import { subscribeWithSelector } from "zustand/middleware"
 import type { ScenePhase, RoseState, GardenStage } from "@/types/scene"
+import type { Moment } from "@/lib/supabase/queries"
 
 interface SceneStore {
   phase: ScenePhase
@@ -31,6 +32,8 @@ interface SceneStore {
   isEmergence: boolean
   // Once emergence completes the dome is permanently gone and the rose spins freely.
   domeRemoved: boolean
+  // A scheduled moment (photo / clip / message) currently being shown after tending.
+  activeMoment: Moment | null
 
   setPhase: (phase: ScenePhase) => void
   setRose: (rose: RoseState) => void
@@ -52,6 +55,7 @@ interface SceneStore {
   setMagicActive: (v: boolean) => void
   setIsEmergence: (v: boolean) => void
   setDomeRemoved: (v: boolean) => void
+  setActiveMoment: (m: Moment | null) => void
 }
 
 export const useSceneStore = create<SceneStore>()(
@@ -75,6 +79,7 @@ export const useSceneStore = create<SceneStore>()(
     magicActive: false,
     isEmergence: false,
     domeRemoved: false,
+    activeMoment: null,
 
     setPhase: (phase) =>
       set((s) => ({ phase, previousPhase: s.phase })),
@@ -107,6 +112,7 @@ export const useSceneStore = create<SceneStore>()(
     setMagicActive: (v) => set({ magicActive: v }),
     setIsEmergence: (v) => set({ isEmergence: v }),
     setDomeRemoved: (v) => set({ domeRemoved: v }),
+    setActiveMoment: (m) => set({ activeMoment: m }),
   }))
 )
 

@@ -146,6 +146,111 @@ async function consumeDueScheduledMessage(today: Date): Promise<{ message: strin
   }
 }
 
+// ── Moments: scheduled photo / clip / message (managed from /rosesecret) ──
+export interface Moment {
+  id: string
+  title: string | null
+  message: string | null
+  photo_url: string | null
+  video_url: string | null
+  trigger_visit: number | null   // show on/after this visit number
+  trigger_date: string | null    // OR show on/after this date (ISO)
+  shown: boolean
+  shown_at: string | null
+  created_at: string
+}
+
+export async function fetchMoments(): Promise<Moment[]> {
+  try {
+    const sb = getSupabaseClient()
+    const { data } = await sb
+      .from("scheduled_moments")
+      .select("*")
+      .order("shown", { ascending: true })
+      .order("trigger_visit", { ascending: true, nullsFirst: false })
+      .order("trigger_date", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: true })
+    return (data ?? []) as Moment[]
+  } catch {
+    return []
+  }
+}
+
+export async function createMoment(input: {
+  title?: string
+  message?: string
+  photo_url?: string | null
+  video_url?: string | null
+  trigger_visit?: number | null
+  trigger_date?: string | null
+}): Promise<Moment | null> {
+  const sb = getSupabaseClient()
+  const { data, error } = await sb
+    .from("scheduled_moments")
+    .insert({
+      title:         input.title?.trim() || null,
+      message:       input.message?.trim() || null,
+      photo_url:     input.photo_url || null,
+      video_url:     input.video_url || null,
+      trigger_visit: input.trigger_visit ?? null,
+      trigger_date:  input.trigger_date || null,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return (data ?? null) as Moment | null
+}
+
+export async function deleteMoment(id: string): Promise<void> {
+  const sb = getSupabaseClient()
+  const { error } = await sb.from("scheduled_moments").delete().eq("id", id)
+  if (error) throw error
+}
+
+// Upload a photo/clip to the public 'moments' storage bucket; return its URL.
+export async function uploadMomentFile(file: File): Promise<string> {
+  const sb = getSupabaseClient()
+  const ext  = file.name.split(".").pop() || "bin"
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+  const { error } = await sb.storage.from("moments").upload(path, file, {
+    cacheControl: "3600",
+    upsert: false,
+    contentType: file.type || undefined,
+  })
+  if (error) throw error
+  const { data } = sb.storage.from("moments").getPublicUrl(path)
+  return data.publicUrl
+}
+
+// Pick the next due moment for this visit (and mark it shown). null if none.
+async function consumeDueMoment(totalVisits: number, today: Date): Promise<Moment | null> {
+  try {
+    const sb = getSupabaseClient()
+    const todayStr = today.toISOString().slice(0, 10)
+    const { data } = await sb
+      .from("scheduled_moments")
+      .select("*")
+      .eq("shown", false)
+      .order("trigger_visit", { ascending: true, nullsFirst: false })
+      .order("trigger_date", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: true })
+    const list = (data ?? []) as Moment[]
+    const due = list.find(
+      (m) =>
+        (m.trigger_visit != null && totalVisits >= m.trigger_visit) ||
+        (m.trigger_date != null && m.trigger_date <= todayStr)
+    )
+    if (!due) return null
+    await sb
+      .from("scheduled_moments")
+      .update({ shown: true, shown_at: new Date().toISOString() })
+      .eq("id", due.id)
+    return due
+  } catch {
+    return null
+  }
+}
+
 export async function fetchRoseState(): Promise<RoseState | null> {
   const sb = getSupabaseClient()
   const { data } = await sb.from("rose_state").select("*").eq("id", ROSE_ID).single()
@@ -158,6 +263,7 @@ export async function recordVisit(): Promise<{
   message: string
   isFirstToday: boolean
   milestone: MilestoneInfo
+  moment: Moment | null
 }> {
   const sb = getSupabaseClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -186,6 +292,7 @@ export async function recordVisit(): Promise<{
       message,
       isFirstToday: false,
       milestone,
+      moment: null,
     }
   }
 
@@ -227,6 +334,9 @@ export async function recordVisit(): Promise<{
   const newChapter  = chapterForVisits(newTotalVisits)
   const milestone   = await buildMilestoneInfo(newTotalVisits, newChapter > prevChapter)
 
+  // A scheduled moment (photo / clip / message) due on this visit or date
+  const moment = await consumeDueMoment(newTotalVisits, now)
+
   await sb.from("visit_log").insert({
     visited_at: now.toISOString(),
     petals_at_visit: newPetals,
@@ -247,6 +357,7 @@ export async function recordVisit(): Promise<{
     message,
     isFirstToday: true,
     milestone,
+    moment,
   }
 }
 

@@ -4,7 +4,12 @@ import {
   fetchScheduledMessages,
   createScheduledMessage,
   deleteScheduledMessage,
+  fetchMoments,
+  createMoment,
+  deleteMoment,
+  uploadMomentFile,
   type ScheduledMessage,
+  type Moment,
 } from "@/lib/supabase/queries"
 
 const PASSWORD = "thebeauty"
@@ -255,6 +260,179 @@ function Admin() {
           ))}
         </section>
       )}
+
+      <div style={{ height: 1, background: "rgba(184,148,74,0.14)", margin: "8px 0" }} />
+
+      <MomentsAdmin />
+    </div>
+  )
+}
+
+// ── Moments: schedule a photo / clip / message for a visit number or a date ──
+function MomentsAdmin() {
+  const [items, setItems]     = useState<Moment[]>([])
+  const [loading, setLoading] = useState(true)
+  const [title, setTitle]     = useState("")
+  const [message, setMessage] = useState("")
+  const [photoUrl, setPhotoUrl] = useState("")
+  const [videoUrl, setVideoUrl] = useState("")
+  const [triggerKind, setTriggerKind] = useState<"visit" | "date">("visit")
+  const [visit, setVisit]     = useState("")
+  const [date, setDate]       = useState("")
+  const [saving, setSaving]   = useState(false)
+  const [uploading, setUploading] = useState<"photo" | "video" | null>(null)
+  const [error, setError]     = useState<string | null>(null)
+
+  const reload = useCallback(async () => {
+    setLoading(true)
+    try { setItems(await fetchMoments()); setError(null) }
+    catch { setError("Could not load moments. Is the database reachable?") }
+    finally { setLoading(false) }
+  }, [])
+  useEffect(() => { reload() }, [reload])
+
+  const onUpload = async (file: File | undefined, kind: "photo" | "video") => {
+    if (!file) return
+    setUploading(kind)
+    try {
+      const url = await uploadMomentFile(file)
+      if (kind === "photo") setPhotoUrl(url); else setVideoUrl(url)
+    } catch {
+      setError("Upload failed. Run migration 005 (the 'moments' storage bucket) in Supabase.")
+    } finally { setUploading(null) }
+  }
+
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const hasContent = message.trim() || photoUrl || videoUrl || title.trim()
+    const hasTrigger = (triggerKind === "visit" && visit) || (triggerKind === "date" && date)
+    if (!hasContent || !hasTrigger) { setError("Add some content and a trigger (visit number or date)."); return }
+    setSaving(true)
+    try {
+      await createMoment({
+        title, message,
+        photo_url: photoUrl || null,
+        video_url: videoUrl || null,
+        trigger_visit: triggerKind === "visit" ? parseInt(visit, 10) : null,
+        trigger_date:  triggerKind === "date" ? date : null,
+      })
+      setTitle(""); setMessage(""); setPhotoUrl(""); setVideoUrl(""); setVisit(""); setDate("")
+      await reload()
+    } catch {
+      setError("Could not save. Make sure migration 005 has been run in Supabase.")
+    } finally { setSaving(false) }
+  }
+
+  const remove = async (id: string) => {
+    try { await deleteMoment(id); setItems((p) => p.filter((m) => m.id !== id)) }
+    catch { setError("Could not delete that moment.") }
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%", padding: "11px 14px", borderRadius: 12,
+    background: "rgba(255,255,255,0.04)", border: "1px solid rgba(184,148,74,0.22)",
+    color: "#f2ece0", fontFamily: "'EB Garamond', serif", fontSize: 15, outline: "none",
+  }
+  const pending = items.filter((m) => !m.shown)
+  const past = items.filter((m) => m.shown)
+
+  return (
+    <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <span className="t-label" style={{ fontSize: 9, letterSpacing: "0.3em", color: "rgba(184,148,74,0.6)" }}>
+          Moments
+        </span>
+        <h2 className="t-display" style={{ fontSize: 24, fontStyle: "italic", color: "rgba(242,236,224,0.92)" }}>
+          A photo, a clip, a message
+        </h2>
+        <p className="t-serif" style={{ fontSize: 13.5, color: "rgba(242,236,224,0.5)", lineHeight: 1.5 }}>
+          Schedule a moment to appear when she tends the rose on a chosen visit (e.g. the 5th) or a date.
+        </p>
+      </div>
+
+      <form onSubmit={add} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)" style={inputStyle} />
+        <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Message (optional)" rows={3} style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }} />
+
+        {/* Photo */}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <label style={{ ...inputStyle, flex: "1 1 150px", cursor: "pointer", color: uploading === "photo" ? "rgba(242,236,224,0.5)" : "#c9a84c" }}>
+            {uploading === "photo" ? "Uploading photo…" : (photoUrl ? "✓ Photo added — replace" : "Upload photo")}
+            <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => onUpload(e.target.files?.[0], "photo")} />
+          </label>
+          <input value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} placeholder="…or paste photo URL" style={{ ...inputStyle, flex: "1 1 150px" }} />
+        </div>
+
+        {/* Video */}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <label style={{ ...inputStyle, flex: "1 1 150px", cursor: "pointer", color: uploading === "video" ? "rgba(242,236,224,0.5)" : "#c9a84c" }}>
+            {uploading === "video" ? "Uploading clip…" : (videoUrl ? "✓ Clip added — replace" : "Upload clip")}
+            <input type="file" accept="video/*" style={{ display: "none" }} onChange={(e) => onUpload(e.target.files?.[0], "video")} />
+          </label>
+          <input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="…or paste clip URL" style={{ ...inputStyle, flex: "1 1 150px" }} />
+        </div>
+
+        {/* Trigger */}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <select value={triggerKind} onChange={(e) => setTriggerKind(e.target.value as "visit" | "date")} style={{ ...inputStyle, flex: "1 1 140px", colorScheme: "dark" }}>
+            <option value="visit">On visit number</option>
+            <option value="date">On a date</option>
+          </select>
+          {triggerKind === "visit" ? (
+            <input type="number" min={1} value={visit} onChange={(e) => setVisit(e.target.value)} placeholder="e.g. 5" style={{ ...inputStyle, flex: "1 1 140px" }} />
+          ) : (
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ ...inputStyle, flex: "1 1 160px", colorScheme: "dark" }} />
+          )}
+        </div>
+
+        <button type="submit" disabled={saving} style={{
+          alignSelf: "flex-start", padding: "11px 26px", borderRadius: 999,
+          background: "linear-gradient(135deg, rgba(138,21,40,0.9), rgba(100,12,28,0.95))",
+          border: "1px solid rgba(184,148,74,0.28)", color: "rgba(242,236,224,0.9)",
+          fontFamily: "'EB Garamond', serif", fontSize: 14, letterSpacing: "0.05em",
+          cursor: saving ? "default" : "pointer", opacity: saving ? 0.5 : 1,
+        }}>
+          {saving ? "Saving…" : "Schedule moment"}
+        </button>
+      </form>
+
+      {error && <p className="t-serif" style={{ fontSize: 13, color: "rgba(200,80,90,0.85)" }}>{error}</p>}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <span className="t-label" style={{ fontSize: 9, letterSpacing: "0.26em", color: "rgba(184,148,74,0.55)" }}>
+          Upcoming moments ({pending.length})
+        </span>
+        {loading && <p className="t-serif" style={{ fontSize: 13, color: "rgba(242,236,224,0.4)" }}>Loading…</p>}
+        {!loading && pending.length === 0 && <p className="t-serif" style={{ fontSize: 14, color: "rgba(242,236,224,0.4)" }}>No moments yet.</p>}
+        {pending.map((m) => <MomentRow key={m.id} m={m} onDelete={() => remove(m.id)} />)}
+        {past.map((m) => <MomentRow key={m.id} m={m} onDelete={() => remove(m.id)} dim />)}
+      </div>
+    </section>
+  )
+}
+
+function MomentRow({ m, onDelete, dim }: { m: Moment; onDelete: () => void; dim?: boolean }) {
+  const when = m.trigger_visit != null ? `Visit #${m.trigger_visit}` : m.trigger_date ? `On ${m.trigger_date}` : "—"
+  const bits = [m.photo_url && "photo", m.video_url && "clip", m.message && "message"].filter(Boolean).join(" · ")
+  return (
+    <div style={{
+      display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between",
+      padding: "12px 14px", borderRadius: 14,
+      background: "rgba(255,255,255,0.03)", border: "1px solid rgba(184,148,74,0.16)", opacity: dim ? 0.5 : 1,
+    }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, minWidth: 0 }}>
+        <span className="t-display" style={{ fontSize: 15, fontStyle: "italic", color: "rgba(242,236,224,0.9)" }}>
+          {m.title || m.message || bits || "Moment"}
+        </span>
+        <span className="t-label" style={{ fontSize: 9, letterSpacing: "0.18em", color: "rgba(184,148,74,0.6)" }}>
+          {when}{bits ? ` · ${bits}` : ""}{m.shown ? " · delivered" : ""}
+        </span>
+      </div>
+      <button onClick={onDelete} aria-label="Delete" style={{
+        flexShrink: 0, width: 28, height: 28, borderRadius: 999,
+        background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+        color: "rgba(242,236,224,0.6)", cursor: "pointer", fontSize: 14, lineHeight: 1,
+      }}>×</button>
     </div>
   )
 }
