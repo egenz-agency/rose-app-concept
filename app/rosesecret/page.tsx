@@ -276,9 +276,10 @@ function MomentsAdmin() {
   const [message, setMessage] = useState("")
   const [photoUrl, setPhotoUrl] = useState("")
   const [videoUrl, setVideoUrl] = useState("")
-  const [triggerKind, setTriggerKind] = useState<"visit" | "date">("visit")
+  const [triggerKind, setTriggerKind] = useState<"visit" | "date" | "repeat">("visit")
   const [visit, setVisit]     = useState("")
   const [date, setDate]       = useState("")
+  const [repeat, setRepeat]   = useState("")
   const [saving, setSaving]   = useState(false)
   const [uploading, setUploading] = useState<"photo" | "video" | null>(null)
   const [error, setError]     = useState<string | null>(null)
@@ -305,8 +306,8 @@ function MomentsAdmin() {
   const add = async (e: React.FormEvent) => {
     e.preventDefault()
     const hasContent = message.trim() || photoUrl || videoUrl || title.trim()
-    const hasTrigger = (triggerKind === "visit" && visit) || (triggerKind === "date" && date)
-    if (!hasContent || !hasTrigger) { setError("Add some content and a trigger (visit number or date)."); return }
+    const hasTrigger = (triggerKind === "visit" && visit) || (triggerKind === "date" && date) || (triggerKind === "repeat" && repeat)
+    if (!hasContent || !hasTrigger) { setError("Add some content and a trigger (visit number, date, or every N visits)."); return }
     setSaving(true)
     try {
       await createMoment({
@@ -315,8 +316,9 @@ function MomentsAdmin() {
         video_url: videoUrl || null,
         trigger_visit: triggerKind === "visit" ? parseInt(visit, 10) : null,
         trigger_date:  triggerKind === "date" ? date : null,
+        repeat_every:  triggerKind === "repeat" ? parseInt(repeat, 10) : null,
       })
-      setTitle(""); setMessage(""); setPhotoUrl(""); setVideoUrl(""); setVisit(""); setDate("")
+      setTitle(""); setMessage(""); setPhotoUrl(""); setVideoUrl(""); setVisit(""); setDate(""); setRepeat("")
       await reload()
     } catch {
       setError("Could not save. Make sure migration 005 has been run in Supabase.")
@@ -374,14 +376,19 @@ function MomentsAdmin() {
 
         {/* Trigger */}
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-          <select value={triggerKind} onChange={(e) => setTriggerKind(e.target.value as "visit" | "date")} style={{ ...inputStyle, flex: "1 1 140px", colorScheme: "dark" }}>
+          <select value={triggerKind} onChange={(e) => setTriggerKind(e.target.value as "visit" | "date" | "repeat")} style={{ ...inputStyle, flex: "1 1 140px", colorScheme: "dark" }}>
             <option value="visit">On visit number</option>
             <option value="date">On a date</option>
+            <option value="repeat">Every N visits</option>
           </select>
-          {triggerKind === "visit" ? (
+          {triggerKind === "visit" && (
             <input type="number" min={1} value={visit} onChange={(e) => setVisit(e.target.value)} placeholder="e.g. 5" style={{ ...inputStyle, flex: "1 1 140px" }} />
-          ) : (
+          )}
+          {triggerKind === "date" && (
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ ...inputStyle, flex: "1 1 160px", colorScheme: "dark" }} />
+          )}
+          {triggerKind === "repeat" && (
+            <input type="number" min={1} value={repeat} onChange={(e) => setRepeat(e.target.value)} placeholder="every … visits (e.g. 3)" style={{ ...inputStyle, flex: "1 1 160px" }} />
           )}
         </div>
 
@@ -412,7 +419,7 @@ function MomentsAdmin() {
 }
 
 function MomentRow({ m, onDelete, dim }: { m: Moment; onDelete: () => void; dim?: boolean }) {
-  const when = m.trigger_visit != null ? `Visit #${m.trigger_visit}` : m.trigger_date ? `On ${m.trigger_date}` : "—"
+  const when = m.repeat_every ? `Every ${m.repeat_every} visits` : m.trigger_visit != null ? `Visit #${m.trigger_visit}` : m.trigger_date ? `On ${m.trigger_date}` : "—"
   const bits = [m.photo_url && "photo", m.video_url && "clip", m.message && "message"].filter(Boolean).join(" · ")
   return (
     <div style={{

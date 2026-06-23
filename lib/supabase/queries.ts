@@ -155,6 +155,7 @@ export interface Moment {
   video_url: string | null
   trigger_visit: number | null   // show on/after this visit number
   trigger_date: string | null    // OR show on/after this date (ISO)
+  repeat_every: number | null    // OR recur every N visits (e.g. 3 = every 3rd visit)
   shown: boolean
   shown_at: string | null
   created_at: string
@@ -183,6 +184,7 @@ export async function createMoment(input: {
   video_url?: string | null
   trigger_visit?: number | null
   trigger_date?: string | null
+  repeat_every?: number | null
 }): Promise<Moment | null> {
   const sb = getSupabaseClient()
   const { data, error } = await sb
@@ -194,6 +196,7 @@ export async function createMoment(input: {
       video_url:     input.video_url || null,
       trigger_visit: input.trigger_visit ?? null,
       trigger_date:  input.trigger_date || null,
+      repeat_every:  input.repeat_every ?? null,
     })
     .select()
     .single()
@@ -222,7 +225,8 @@ export async function uploadMomentFile(file: File): Promise<string> {
   return data.publicUrl
 }
 
-// Pick the next due moment for this visit (and mark it shown). null if none.
+// Pick the next due moment for this visit. One-time moments are marked shown;
+// recurring ones (repeat_every) fire again every N visits and are NOT marked.
 async function consumeDueMoment(totalVisits: number, today: Date): Promise<Moment | null> {
   try {
     const sb = getSupabaseClient()
@@ -235,16 +239,20 @@ async function consumeDueMoment(totalVisits: number, today: Date): Promise<Momen
       .order("trigger_date", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: true })
     const list = (data ?? []) as Moment[]
-    const due = list.find(
-      (m) =>
-        (m.trigger_visit != null && totalVisits >= m.trigger_visit) ||
-        (m.trigger_date != null && m.trigger_date <= todayStr)
-    )
+    const due = list.find((m) => {
+      if (m.repeat_every && m.repeat_every > 0) return totalVisits > 0 && totalVisits % m.repeat_every === 0
+      if (m.trigger_visit != null) return totalVisits >= m.trigger_visit
+      if (m.trigger_date != null) return m.trigger_date <= todayStr
+      return false
+    })
     if (!due) return null
-    await sb
-      .from("scheduled_moments")
-      .update({ shown: true, shown_at: new Date().toISOString() })
-      .eq("id", due.id)
+    // Recurring moments keep firing — leave them unshown. One-time ones are spent.
+    if (!due.repeat_every) {
+      await sb
+        .from("scheduled_moments")
+        .update({ shown: true, shown_at: new Date().toISOString() })
+        .eq("id", due.id)
+    }
     return due
   } catch {
     return null
@@ -325,17 +333,27 @@ export async function recordVisit(): Promise<{
   // Check and unlock letters
   await checkLetterUnlocks(newTotalVisits)
 
-  // A custom message the owner scheduled takes priority over the random note.
-  const scheduled = await consumeDueScheduledMessage(now)
-  const message = scheduled?.message ?? (await getRandomMessage())
+  const message = await getRandomMessage()
 
   // Did this visit cross a new chapter milestone?
   const prevChapter = chapterForVisits(current.total_visits)
   const newChapter  = chapterForVisits(newTotalVisits)
   const milestone   = await buildMilestoneInfo(newTotalVisits, newChapter > prevChapter)
 
-  // A scheduled moment (photo / clip / message) due on this visit or date
-  const moment = await consumeDueMoment(newTotalVisits, now)
+  // Scheduled content surfaces as a prominent "moment" reveal. A due moment
+  // (photo / clip / message) wins; otherwise a legacy scheduled message becomes
+  // a message-only moment so it still shows.
+  let moment = await consumeDueMoment(newTotalVisits, now)
+  if (!moment) {
+    const sm = await consumeDueScheduledMessage(now)
+    if (sm) {
+      moment = {
+        id: `msg-${Date.now()}`, title: sm.author, message: sm.message,
+        photo_url: null, video_url: null, trigger_visit: null, trigger_date: null,
+        repeat_every: null, shown: true, shown_at: null, created_at: new Date().toISOString(),
+      }
+    }
+  }
 
   await sb.from("visit_log").insert({
     visited_at: now.toISOString(),

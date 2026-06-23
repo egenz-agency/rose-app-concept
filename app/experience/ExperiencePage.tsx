@@ -19,7 +19,7 @@ import { HoldRing } from "@/components/ui/HoldRing"
 import { ViewControls } from "@/components/ui/ViewControls"
 import { SceneErrorBoundary } from "@/components/scene/SceneErrorBoundary"
 import { useSceneStore } from "@/lib/store/sceneStore"
-import { fetchRoseState, createMemoryStar } from "@/lib/supabase/queries"
+import { fetchRoseState, createMemoryStar, recordVisit } from "@/lib/supabase/queries"
 import { useQueryClient } from "@tanstack/react-query"
 
 const HOLD_DURATION_MS = 1500
@@ -44,6 +44,8 @@ function ExperienceInner() {
   const setViewPreset   = useSceneStore((s) => s.setViewPreset)
   const triggerBloom    = useSceneStore((s) => s.triggerBloom)
   const magicActive     = useSceneStore((s) => s.magicActive)
+  const setDailyMessage = useSceneStore((s) => s.setDailyMessage)
+  const setActiveMoment = useSceneStore((s) => s.setActiveMoment)
 
   const queryClient     = useQueryClient()
 
@@ -95,6 +97,22 @@ function ExperienceInner() {
     setViewPreset("close")
     triggerBloom()
 
+    // Press-and-hold IS tending the rose: record the visit. This drops petals
+    // for missed days, advances the chapter, and surfaces any scheduled
+    // message / moment the owner pre-loaded for today.
+    recordVisit()
+      .then((result) => {
+        setRose(result.rose)
+        setDailyMessage(result.message)
+        setFallenPetals(Array.from({ length: 40 - result.rose.petalsRemaining }, (_, i) => i))
+        queryClient.invalidateQueries({ queryKey: ["rose-state"] })
+        if (result.moment) {
+          // Reveal it once the bloom has settled
+          window.setTimeout(() => setActiveMoment(result.moment), 1700)
+        }
+      })
+      .catch(() => {})
+
     // A beat after the bloom begins, a new star is born into the constellation
     window.setTimeout(() => {
       createMemoryStar({
@@ -113,7 +131,7 @@ function ExperienceInner() {
       setMagicActive(false)
       setViewPreset("default")
     }, 4200)
-  }, [setMagicActive, setDomeLifted, setViewPreset, triggerBloom, queryClient])
+  }, [setMagicActive, setDomeLifted, setViewPreset, triggerBloom, queryClient, setRose, setDailyMessage, setFallenPetals, setActiveMoment])
 
   const startHold = useCallback(() => {
     if (phase !== "IDLE" || magicActive) return
