@@ -1,5 +1,5 @@
 "use client"
-import { useRef, useMemo, type MutableRefObject } from "react"
+import { useRef, useMemo } from "react"
 import { useFrame } from "@react-three/fiber"
 import { Sphere } from "@react-three/drei"
 import * as THREE from "three"
@@ -23,11 +23,9 @@ function orbitParams(id: string) {
 // ── Single orbiting star ─────────────────────────────────────────
 function MemoryStar({
   star,
-  posCache,
   isNewborn,
 }: {
   star: StarRow
-  posCache: MutableRefObject<Map<string, THREE.Vector3>>
   isNewborn: boolean
 }) {
   const meshRef   = useRef<THREE.Mesh>(null)
@@ -66,30 +64,24 @@ function MemoryStar({
 
     meshRef.current.position.set(x, y, z)
     meshRef.current.scale.setScalar(s)
-
-    // Share position so ConstellationLines can draw connecting lines
-    posCache.current.set(star.id, new THREE.Vector3(x, y, z))
   })
 
   return (
-    <group>
-      <Sphere
-        ref={meshRef}
-        args={[0.055, 8, 8]}
-        onClick={() => openPanel(`star-${star.id}`)}
-        onPointerEnter={() => { document.body.style.cursor = "pointer" }}
-        onPointerLeave={() => { document.body.style.cursor = "auto" }}
-      >
-        <meshStandardMaterial
-          color="#c9a84c"
-          emissive="#c9a84c"
-          emissiveIntensity={1.6}
-          roughness={0.1}
-          metalness={0.8}
-        />
-      </Sphere>
-      <pointLight color="#c9a84c" intensity={0.4} distance={1.2} decay={2} />
-    </group>
+    <Sphere
+      ref={meshRef}
+      args={[0.055, 8, 8]}
+      onClick={() => openPanel(`star-${star.id}`)}
+      onPointerEnter={() => { document.body.style.cursor = "pointer" }}
+      onPointerLeave={() => { document.body.style.cursor = "auto" }}
+    >
+      <meshStandardMaterial
+        color="#c9a84c"
+        emissive="#c9a84c"
+        emissiveIntensity={1.6}
+        roughness={0.1}
+        metalness={0.8}
+      />
+    </Sphere>
   )
 }
 
@@ -121,8 +113,6 @@ function EmptyStar() {
 
 // ── Root ─────────────────────────────────────────────────────────
 export function MemoryStarField() {
-  const posCache = useRef<Map<string, THREE.Vector3>>(new Map())
-
   const { data: stars = [] } = useQuery({
     queryKey: ["memory-stars"],
     queryFn: fetchMemoryStars,
@@ -149,7 +139,6 @@ export function MemoryStarField() {
         <MemoryStar
           key={star.id}
           star={star}
-          posCache={posCache}
           isNewborn={star.id === newbornId}
         />
       ))}

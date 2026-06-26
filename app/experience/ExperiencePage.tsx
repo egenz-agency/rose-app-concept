@@ -19,7 +19,7 @@ import { HoldRing } from "@/components/ui/HoldRing"
 import { ViewControls } from "@/components/ui/ViewControls"
 import { SceneErrorBoundary } from "@/components/scene/SceneErrorBoundary"
 import { useSceneStore } from "@/lib/store/sceneStore"
-import { fetchRoseState, createMemoryStar, recordVisit } from "@/lib/supabase/queries"
+import { fetchRoseState, recordVisit } from "@/lib/supabase/queries"
 import { useQueryClient } from "@tanstack/react-query"
 
 const HOLD_DURATION_MS = 1500
@@ -90,7 +90,7 @@ function ExperienceInner() {
 
   // ── Magic bloom sequence ───────────────────────────────────────
   // Hold the rose → glass lifts, stars whirl, light sparkles burst, the rose
-  // blooms up close, and a new star is born — then everything settles back.
+  // blooms up close — then everything settles back.
   const runMagic = useCallback(() => {
     setMagicActive(true)
     setDomeLifted(true)
@@ -112,19 +112,6 @@ function ExperienceInner() {
         }
       })
       .catch(() => {})
-
-    // A beat after the bloom begins, a new star is born into the constellation
-    window.setTimeout(() => {
-      createMemoryStar({
-        title: "A new star",
-        date: new Date().toISOString().slice(0, 10),
-        memory: "Born from a moment of magic.",
-        photos: [],
-        position: [0, 0, 0],
-      })
-        .then(() => queryClient.invalidateQueries({ queryKey: ["memory-stars"] }))
-        .catch(() => {})
-    }, 900)
 
     // Settle everything back to normal
     window.setTimeout(() => {
