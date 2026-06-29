@@ -11,8 +11,18 @@ const FALLBACK_URL = "https://gwjmiqjativwhsiwryqw.supabase.co"
 const FALLBACK_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3am1pcWphdGl2d2hzaXdyeXF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODE4MDQsImV4cCI6MjA5NjE1NzgwNH0.--kQuhqwrvdLa_Q9zA34y4bvmX5_5btahAICINKbyu4"
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || FALLBACK_URL
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || FALLBACK_KEY
+// Use the environment override ONLY when BOTH the URL and the anon key are present.
+// Otherwise a half-configured Vercel integration (e.g. a stray
+// NEXT_PUBLIC_SUPABASE_URL pointing at a different/empty project) could pair a
+// wrong URL with the fallback key and break the app. Both-or-neither keeps the
+// deployed app pinned to the enchanted-rose fallback unless you deliberately set
+// a complete, matching pair.
+const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const envKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const useEnv = Boolean(envUrl && envKey)
+
+const SUPABASE_URL = useEnv ? (envUrl as string) : FALLBACK_URL
+const SUPABASE_KEY = useEnv ? (envKey as string) : FALLBACK_KEY
 
 export const isSupabaseConfigured =
   SUPABASE_URL.startsWith("http://") || SUPABASE_URL.startsWith("https://")

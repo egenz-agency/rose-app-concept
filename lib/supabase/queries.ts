@@ -121,29 +121,74 @@ export async function deleteScheduledMessage(id: string): Promise<void> {
   if (error) throw error
 }
 
-// Pick the next due custom message (and mark it shown). Returns null if none.
-async function consumeDueScheduledMessage(today: Date): Promise<{ message: string; author: string | null } | null> {
+// Local-calendar date string (YYYY-MM-DD). Uses local time to match date-fns
+// `isToday` (which the visit/petal logic relies on) and the date the owner
+// picked in the admin panel's date input — so "today" means the same thing
+// everywhere, even late at night when UTC has already rolled to the next day.
+function localDateStr(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
+// Find the scheduled message to reveal on this press-and-hold. Returns null if none.
+//
+// Two cases, in priority order:
+//   1. A message dated for TODAY → always returned, every time she holds today,
+//      so she can re-watch the same message. It's marked "delivered" on the
+//      first reveal (for the admin panel) but keeps re-showing all day because
+//      we match it by date, not by the shown flag.
+//   2. An UNDELIVERED message that's overdue (past date) or queued for "next
+//      visit" (no date) → shown once, then marked delivered.
+async function getScheduledMessageReveal(today: Date): Promise<{ message: string; author: string | null } | null> {
   try {
     const sb = getSupabaseClient()
-    const todayStr = today.toISOString().slice(0, 10)
+    const todayStr = localDateStr(today)
     const { data } = await sb
       .from("scheduled_messages")
       .select("*")
-      .eq("shown", false)
       .order("scheduled_for", { ascending: true, nullsFirst: true })
       .order("created_at", { ascending: true })
     const list = (data ?? []) as ScheduledMessage[]
-    // Due = no date (next-visit queue) OR a date that has arrived
-    const due = list.find((m) => !m.scheduled_for || m.scheduled_for <= todayStr)
-    if (!due) return null
-    await sb
-      .from("scheduled_messages")
-      .update({ shown: true, shown_at: new Date().toISOString() })
-      .eq("id", due.id)
-    return { message: due.message, author: due.author }
+
+    // 1. Dated exactly for today → re-showable all day
+    let pick = list.find((m) => m.scheduled_for === todayStr)
+    // 2. Otherwise an undelivered overdue / next-visit message
+    if (!pick) pick = list.find((m) => !m.shown && (!m.scheduled_for || m.scheduled_for < todayStr))
+    if (!pick) return null
+
+    // Mark delivered on first reveal (today's keeps re-showing regardless)
+    if (!pick.shown) {
+      await sb
+        .from("scheduled_messages")
+        .update({ shown: true, shown_at: new Date().toISOString() })
+        .eq("id", pick.id)
+    }
+    return { message: pick.message, author: pick.author }
   } catch {
     return null
   }
+}
+
+// Resolve whatever scheduled content should reveal on this hold: a due moment
+// (photo / clip / message) wins; otherwise a scheduled message becomes a
+// message-only moment so it still shows. Runs on every press-and-hold — not
+// just the first visit of the day — so a message can re-appear when she holds
+// the rose again later the same day.
+async function getDueReveal(totalVisits: number, now: Date): Promise<Moment | null> {
+  let moment = await consumeDueMoment(totalVisits, now)
+  if (!moment) {
+    const sm = await getScheduledMessageReveal(now)
+    if (sm) {
+      moment = {
+        id: `msg-${Date.now()}`, title: sm.author, message: sm.message,
+        photo_url: null, video_url: null, trigger_visit: null, trigger_date: null,
+        repeat_every: null, shown: true, shown_at: null, created_at: new Date().toISOString(),
+      }
+    }
+  }
+  return moment
 }
 
 // ── Moments: scheduled photo / clip / message (managed from /rosesecret) ──
@@ -230,7 +275,7 @@ export async function uploadMomentFile(file: File): Promise<string> {
 async function consumeDueMoment(totalVisits: number, today: Date): Promise<Moment | null> {
   try {
     const sb = getSupabaseClient()
-    const todayStr = today.toISOString().slice(0, 10)
+    const todayStr = localDateStr(today)
     const { data } = await sb
       .from("scheduled_moments")
       .select("*")
@@ -283,9 +328,11 @@ export async function recordVisit(): Promise<{
   const isFirstToday = !lastVisit || !isToday(lastVisit)
 
   if (!isFirstToday) {
-    // Already visited today — just return current state + message
+    // Already visited today — tending again doesn't drop petals or advance the
+    // chapter, but she can still re-watch today's scheduled message / moment.
     const message = await getRandomMessage()
     const milestone = await buildMilestoneInfo(current.total_visits, false)
+    const moment = await getDueReveal(current.total_visits, now)
     return {
       rose: {
         petalsRemaining: current.petals_remaining,
@@ -300,7 +347,7 @@ export async function recordVisit(): Promise<{
       message,
       isFirstToday: false,
       milestone,
-      moment: null,
+      moment,
     }
   }
 
@@ -340,20 +387,8 @@ export async function recordVisit(): Promise<{
   const newChapter  = chapterForVisits(newTotalVisits)
   const milestone   = await buildMilestoneInfo(newTotalVisits, newChapter > prevChapter)
 
-  // Scheduled content surfaces as a prominent "moment" reveal. A due moment
-  // (photo / clip / message) wins; otherwise a legacy scheduled message becomes
-  // a message-only moment so it still shows.
-  let moment = await consumeDueMoment(newTotalVisits, now)
-  if (!moment) {
-    const sm = await consumeDueScheduledMessage(now)
-    if (sm) {
-      moment = {
-        id: `msg-${Date.now()}`, title: sm.author, message: sm.message,
-        photo_url: null, video_url: null, trigger_visit: null, trigger_date: null,
-        repeat_every: null, shown: true, shown_at: null, created_at: new Date().toISOString(),
-      }
-    }
-  }
+  // Scheduled content surfaces as a prominent "moment" reveal.
+  const moment = await getDueReveal(newTotalVisits, now)
 
   await sb.from("visit_log").insert({
     visited_at: now.toISOString(),
