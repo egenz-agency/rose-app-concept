@@ -14,11 +14,10 @@ export default function LoginPage() {
   const [msg, setMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const sb = getSaasBrowserClient()
-
   async function signIn(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true); setError(null); setMsg(null)
+    const sb = getSaasBrowserClient()
     const { error } = await sb.auth.signInWithPassword({ email: email.trim(), password })
     if (error) { setError(error.message); setBusy(false); return }
     router.push("/dashboard"); router.refresh()
@@ -27,6 +26,7 @@ export default function LoginPage() {
   async function signUp() {
     if (!email.trim() || password.length < 6) { setError("Enter an email and a password (6+ characters)."); return }
     setBusy(true); setError(null); setMsg(null)
+    const sb = getSaasBrowserClient()
     const { data, error } = await sb.auth.signUp({ email: email.trim(), password })
     if (error) { setError(error.message); setBusy(false); return }
     if (data.session) { router.push("/dashboard"); router.refresh(); return }
@@ -39,6 +39,7 @@ export default function LoginPage() {
     e.preventDefault()
     if (!email.trim()) return
     setBusy(true); setError(null); setMsg(null)
+    const sb = getSaasBrowserClient()
     const { error } = await sb.auth.signInWithOtp({
       email: email.trim(),
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
