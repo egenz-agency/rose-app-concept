@@ -4,6 +4,14 @@ import { subscribeWithSelector } from "zustand/middleware"
 import type { ScenePhase, RoseState, GardenStage } from "@/types/scene"
 import type { Moment } from "@/lib/supabase/queries"
 
+// Per-tenant customization the gift experience reads (multi-tenant product).
+export interface TenantConfig {
+  recipientName: string | null
+  giverName: string | null
+  introVideoUrl: string | null
+  songUrl: string | null
+}
+
 interface SceneStore {
   phase: ScenePhase
   previousPhase: ScenePhase | null
@@ -34,6 +42,11 @@ interface SceneStore {
   domeRemoved: boolean
   // A scheduled moment (photo / clip / message) currently being shown after tending.
   activeMoment: Moment | null
+  // The gift's tenant slug when running as the multi-tenant product (/r/[slug]).
+  // null = legacy single-tenant mode (the owner's personal gift at "/").
+  tenantSlug: string | null
+  // Per-tenant customization (intro video, song, names). null in legacy mode.
+  tenantConfig: TenantConfig | null
 
   setPhase: (phase: ScenePhase) => void
   setRose: (rose: RoseState) => void
@@ -56,6 +69,8 @@ interface SceneStore {
   setIsEmergence: (v: boolean) => void
   setDomeRemoved: (v: boolean) => void
   setActiveMoment: (m: Moment | null) => void
+  setTenantSlug: (slug: string | null) => void
+  setTenantConfig: (c: TenantConfig | null) => void
 }
 
 export const useSceneStore = create<SceneStore>()(
@@ -80,6 +95,8 @@ export const useSceneStore = create<SceneStore>()(
     isEmergence: false,
     domeRemoved: false,
     activeMoment: null,
+    tenantSlug: null,
+    tenantConfig: null,
 
     setPhase: (phase) =>
       set((s) => ({ phase, previousPhase: s.phase })),
@@ -113,6 +130,8 @@ export const useSceneStore = create<SceneStore>()(
     setIsEmergence: (v) => set({ isEmergence: v }),
     setDomeRemoved: (v) => set({ domeRemoved: v }),
     setActiveMoment: (m) => set({ activeMoment: m }),
+    setTenantSlug: (slug) => set({ tenantSlug: slug }),
+    setTenantConfig: (c) => set({ tenantConfig: c }),
   }))
 )
 

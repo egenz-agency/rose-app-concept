@@ -11,7 +11,11 @@ export function IntroVideo() {
   const setPhase = useSceneStore((s) => s.setPhase)
   const [isMuted,  setIsMuted]  = useState(true)        // start muted → guaranteed autoplay on mobile
   const [showSkip, setShowSkip] = useState(false)
-  const [videoSrc, setVideoSrc] = useState<string>("/intro.mp4") // never null
+  // Tenant's intro video if configured, else the default. (getState in the
+  // initializer so it's read once, after ExperiencePage pinned the config.)
+  const [videoSrc, setVideoSrc] = useState<string>(
+    () => useSceneStore.getState().tenantConfig?.introVideoUrl ?? "/intro.mp4"
+  )
   const videoRef  = useRef<HTMLVideoElement>(null)
   const musicRef  = useRef<HTMLAudioElement | null>(null)
 
@@ -19,7 +23,8 @@ export function IntroVideo() {
   useEffect(() => {
     if (phase === "VIDEO") return
     if (musicRef.current) return
-    const audio = new Audio("/audio/background_music.mp3")
+    const songUrl = useSceneStore.getState().tenantConfig?.songUrl ?? "/audio/background_music.mp3"
+    const audio = new Audio(songUrl)
     audio.loop = true
     audio.volume = 0
     musicRef.current = audio
@@ -38,8 +43,11 @@ export function IntroVideo() {
   }, [phase])
 
   // On return visits, swap in the latest daily video if one exists.
+  // Tenant mode uses the configured intro video instead — skip this legacy
+  // (enchanted-rose) lookup so the product never queries the wrong project.
   useEffect(() => {
     if (phase !== "VIDEO") return
+    if (useSceneStore.getState().tenantSlug) return
     const isFirstEver = !localStorage.getItem(FIRST_VISIT_KEY)
     if (isFirstEver) {
       localStorage.setItem(FIRST_VISIT_KEY, "1")

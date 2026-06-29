@@ -3,7 +3,8 @@ import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useSceneStore } from "@/lib/store/sceneStore"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { recordVisit, TOTAL_CHAPTERS, JOURNEY_DAYS, type MilestoneInfo } from "@/lib/supabase/queries"
+import { recordVisit } from "@/lib/data/roseApi"
+import { TOTAL_CHAPTERS, JOURNEY_DAYS, type MilestoneInfo } from "@/lib/supabase/queries"
 import { CloseIcon } from "./Icons"
 
 export function CarePanel() {

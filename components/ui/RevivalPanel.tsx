@@ -3,7 +3,7 @@ import { useState, useRef, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useSceneStore } from "@/lib/store/sceneStore"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { reviveRose } from "@/lib/supabase/queries"
+import { reviveRose } from "@/lib/data/roseApi"
 import { TRANSITION_PANEL, TRANSITION_ITEM } from "@/lib/animation/easings"
 
 const REVIVAL_HOLD_MS = 3000

@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useQuery } from "@tanstack/react-query"
-import { fetchLetters } from "@/lib/supabase/queries"
+import { fetchLetters } from "@/lib/data/roseApi"
 import { useSceneStore } from "@/lib/store/sceneStore"
 import { TRANSITION_PANEL, TRANSITION_STAGGER, TRANSITION_ITEM } from "@/lib/animation/easings"
 

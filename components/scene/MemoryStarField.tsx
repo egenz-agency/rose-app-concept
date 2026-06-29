@@ -4,7 +4,7 @@ import { useFrame } from "@react-three/fiber"
 import { Sphere } from "@react-three/drei"
 import * as THREE from "three"
 import { useQuery } from "@tanstack/react-query"
-import { fetchMemoryStars } from "@/lib/supabase/queries"
+import { fetchMemoryStars } from "@/lib/data/roseApi"
 import { useSceneStore } from "@/lib/store/sceneStore"
 import type { StarRow } from "@/lib/supabase/queries"
 

@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { fetchMemoryStars, createMemoryStar } from "@/lib/supabase/queries"
+import { fetchMemoryStars, createMemoryStar } from "@/lib/data/roseApi"
 import { useSceneStore } from "@/lib/store/sceneStore"
 import { StarIcon, CloseIcon, ArrowLeftIcon, PlusIcon, SparkleIcon } from "./Icons"
 

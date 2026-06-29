@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useRef, useCallback } from "react"
+import { useEffect, useRef, useCallback, useState } from "react"
 import dynamic from "next/dynamic"
 import { QueryProvider } from "@/components/providers/QueryProvider"
 import { Preloader } from "@/components/ui/Preloader"
@@ -18,8 +18,8 @@ import { MomentPanel } from "@/components/ui/MomentPanel"
 import { HoldRing } from "@/components/ui/HoldRing"
 import { ViewControls } from "@/components/ui/ViewControls"
 import { SceneErrorBoundary } from "@/components/scene/SceneErrorBoundary"
-import { useSceneStore } from "@/lib/store/sceneStore"
-import { fetchRoseState, recordVisit } from "@/lib/supabase/queries"
+import { useSceneStore, type TenantConfig } from "@/lib/store/sceneStore"
+import { fetchRoseState, recordVisit } from "@/lib/data/roseApi"
 import { useQueryClient } from "@tanstack/react-query"
 
 const HOLD_DURATION_MS = 1500
@@ -30,7 +30,15 @@ const SceneRoot = dynamic(
   { ssr: false }
 )
 
-function ExperienceInner() {
+function ExperienceInner({ slug, config }: { slug?: string; config?: TenantConfig | null }) {
+  // Pin the tenant slug + customization into the store ONCE, synchronously on
+  // first render — before any data/media effect runs — so roseApi routes calls to
+  // the right backend and IntroVideo picks up the tenant's video/song.
+  useState(() => {
+    useSceneStore.setState({ tenantSlug: slug ?? null, tenantConfig: config ?? null })
+    return null
+  })
+
   const phase           = useSceneStore((s) => s.phase)
   const setPhase        = useSceneStore((s) => s.setPhase)
   const setRose         = useSceneStore((s) => s.setRose)
@@ -223,10 +231,10 @@ function IdleHint() {
   )
 }
 
-export function ExperiencePage() {
+export function ExperiencePage({ slug, config }: { slug?: string; config?: TenantConfig | null } = {}) {
   return (
     <QueryProvider>
-      <ExperienceInner />
+      <ExperienceInner slug={slug} config={config} />
     </QueryProvider>
   )
 }
