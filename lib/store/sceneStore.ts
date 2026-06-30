@@ -2,7 +2,7 @@
 import { create } from "zustand"
 import { subscribeWithSelector } from "zustand/middleware"
 import type { ScenePhase, RoseState, GardenStage } from "@/types/scene"
-import type { Moment } from "@/lib/supabase/queries"
+import type { Moment, DateInvitation } from "@/lib/supabase/queries"
 
 interface SceneStore {
   phase: ScenePhase
@@ -34,6 +34,8 @@ interface SceneStore {
   domeRemoved: boolean
   // A scheduled moment (photo / clip / message) currently being shown after tending.
   activeMoment: Moment | null
+  // A date invitation currently being shown (interactive RSVP in the envelope).
+  activeInvitation: DateInvitation | null
 
   setPhase: (phase: ScenePhase) => void
   setRose: (rose: RoseState) => void
@@ -56,6 +58,7 @@ interface SceneStore {
   setIsEmergence: (v: boolean) => void
   setDomeRemoved: (v: boolean) => void
   setActiveMoment: (m: Moment | null) => void
+  setActiveInvitation: (i: DateInvitation | null) => void
 }
 
 export const useSceneStore = create<SceneStore>()(
@@ -80,6 +83,7 @@ export const useSceneStore = create<SceneStore>()(
     isEmergence: false,
     domeRemoved: false,
     activeMoment: null,
+    activeInvitation: null,
 
     setPhase: (phase) =>
       set((s) => ({ phase, previousPhase: s.phase })),
@@ -113,6 +117,7 @@ export const useSceneStore = create<SceneStore>()(
     setIsEmergence: (v) => set({ isEmergence: v }),
     setDomeRemoved: (v) => set({ domeRemoved: v }),
     setActiveMoment: (m) => set({ activeMoment: m }),
+    setActiveInvitation: (i) => set({ activeInvitation: i }),
   }))
 )
 

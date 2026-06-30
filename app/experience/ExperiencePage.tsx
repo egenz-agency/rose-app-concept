@@ -15,6 +15,7 @@ import { NavigationHUD } from "@/components/ui/NavigationHUD"
 import { GrowthSimulator } from "@/components/ui/GrowthSimulator"
 import { MissedDayPreview } from "@/components/ui/MissedDayPreview"
 import { MomentPanel } from "@/components/ui/MomentPanel"
+import { InvitationPanel } from "@/components/ui/InvitationPanel"
 import { HoldRing } from "@/components/ui/HoldRing"
 import { ViewControls } from "@/components/ui/ViewControls"
 import { SceneErrorBoundary } from "@/components/scene/SceneErrorBoundary"
@@ -46,6 +47,7 @@ function ExperienceInner() {
   const magicActive     = useSceneStore((s) => s.magicActive)
   const setDailyMessage = useSceneStore((s) => s.setDailyMessage)
   const setActiveMoment = useSceneStore((s) => s.setActiveMoment)
+  const setActiveInvitation = useSceneStore((s) => s.setActiveInvitation)
 
   const queryClient     = useQueryClient()
 
@@ -110,6 +112,10 @@ function ExperienceInner() {
           // Reveal it once the bloom has settled
           window.setTimeout(() => setActiveMoment(result.moment), 1700)
         }
+        if (result.invitation) {
+          // A date invitation opens on top, just after the bloom
+          window.setTimeout(() => setActiveInvitation(result.invitation), 1900)
+        }
       })
       .catch(() => {})
 
@@ -118,7 +124,7 @@ function ExperienceInner() {
       setMagicActive(false)
       setViewPreset("default")
     }, 4200)
-  }, [setMagicActive, setDomeLifted, setViewPreset, triggerBloom, queryClient, setRose, setDailyMessage, setFallenPetals, setActiveMoment])
+  }, [setMagicActive, setDomeLifted, setViewPreset, triggerBloom, queryClient, setRose, setDailyMessage, setFallenPetals, setActiveMoment, setActiveInvitation])
 
   const startHold = useCallback(() => {
     if (phase !== "IDLE" || magicActive) return
@@ -181,6 +187,7 @@ function ExperienceInner() {
       <InstructionsPanel />
       <CarePanel />
       <MomentPanel />
+      <InvitationPanel />
       <RevivalPanel />
       <FinalDeathScene />
       <LettersPanel />

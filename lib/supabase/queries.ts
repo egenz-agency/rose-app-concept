@@ -311,12 +311,108 @@ export async function fetchRoseState(): Promise<RoseState | null> {
   return rowToRoseState(data)
 }
 
+// ── Date invitations: an interactive "come on a date with me" RSVP ──────────
+// Revealed in the envelope with Accept / "propose another time" buttons; her
+// response is written back so the owner can see it in /rosesecret.
+export interface DateInvitation {
+  id: string
+  title: string | null
+  message: string
+  location: string | null
+  proposed_for: string | null     // ISO datetime the owner proposed
+  scheduled_for: string | null     // date the invite appears (null = next visit)
+  status: "pending" | "accepted" | "counter"
+  response_time: string | null     // her accepted or alternative ISO datetime
+  response_note: string | null
+  responded_at: string | null
+  shown: boolean
+  created_at: string
+}
+
+export async function fetchDateInvitations(): Promise<DateInvitation[]> {
+  try {
+    const sb = getSupabaseClient()
+    const { data } = await sb.from("date_invitations").select("*").order("created_at", { ascending: false })
+    return (data ?? []) as DateInvitation[]
+  } catch {
+    return []
+  }
+}
+
+export async function createDateInvitation(input: {
+  message: string
+  title?: string
+  location?: string
+  proposed_for?: string | null
+  scheduled_for?: string | null
+}): Promise<DateInvitation | null> {
+  const sb = getSupabaseClient()
+  const { data, error } = await sb
+    .from("date_invitations")
+    .insert({
+      title: input.title?.trim() || "An invitation",
+      message: input.message,
+      location: input.location?.trim() || null,
+      proposed_for: input.proposed_for || null,
+      scheduled_for: input.scheduled_for || null,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return (data ?? null) as DateInvitation | null
+}
+
+export async function deleteDateInvitation(id: string): Promise<void> {
+  const sb = getSupabaseClient()
+  const { error } = await sb.from("date_invitations").delete().eq("id", id)
+  if (error) throw error
+}
+
+// The pending invitation to reveal on this visit (due by date, not yet answered).
+// Keeps re-appearing each tend until she responds.
+async function getDueInvitation(today: Date): Promise<DateInvitation | null> {
+  try {
+    const sb = getSupabaseClient()
+    const todayStr = localDateStr(today)
+    const { data } = await sb
+      .from("date_invitations")
+      .select("*")
+      .eq("status", "pending")
+      .order("scheduled_for", { ascending: true, nullsFirst: true })
+      .order("created_at", { ascending: true })
+    const list = (data ?? []) as DateInvitation[]
+    const due = list.find((m) => !m.scheduled_for || m.scheduled_for <= todayStr)
+    return due ?? null
+  } catch {
+    return null
+  }
+}
+
+// She accepts the proposed time, or proposes another (with an optional note).
+export async function respondToInvitation(
+  id: string,
+  input: { accepted: boolean; responseTime?: string | null; note?: string | null }
+): Promise<void> {
+  const sb = getSupabaseClient()
+  const { error } = await sb
+    .from("date_invitations")
+    .update({
+      status: input.accepted ? "accepted" : "counter",
+      response_time: input.responseTime || null,
+      response_note: input.note?.trim() || null,
+      responded_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+  if (error) throw error
+}
+
 export async function recordVisit(): Promise<{
   rose: RoseState
   message: string
   isFirstToday: boolean
   milestone: MilestoneInfo
   moment: Moment | null
+  invitation: DateInvitation | null
 }> {
   const sb = getSupabaseClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -333,6 +429,7 @@ export async function recordVisit(): Promise<{
     const message = await getRandomMessage()
     const milestone = await buildMilestoneInfo(current.total_visits, false)
     const moment = await getDueReveal(current.total_visits, now)
+    const invitation = await getDueInvitation(now)
     return {
       rose: {
         petalsRemaining: current.petals_remaining,
@@ -348,6 +445,7 @@ export async function recordVisit(): Promise<{
       isFirstToday: false,
       milestone,
       moment,
+      invitation,
     }
   }
 
@@ -389,6 +487,7 @@ export async function recordVisit(): Promise<{
 
   // Scheduled content surfaces as a prominent "moment" reveal.
   const moment = await getDueReveal(newTotalVisits, now)
+  const invitation = await getDueInvitation(now)
 
   await sb.from("visit_log").insert({
     visited_at: now.toISOString(),
@@ -411,6 +510,7 @@ export async function recordVisit(): Promise<{
     isFirstToday: true,
     milestone,
     moment,
+    invitation,
   }
 }
 

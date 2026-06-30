@@ -8,8 +8,12 @@ import {
   createMoment,
   deleteMoment,
   uploadMomentFile,
+  fetchDateInvitations,
+  createDateInvitation,
+  deleteDateInvitation,
   type ScheduledMessage,
   type Moment,
+  type DateInvitation,
 } from "@/lib/supabase/queries"
 
 const PASSWORD = "thebeauty"
@@ -40,7 +44,9 @@ export default function RoseSecretPage() {
   return (
     <main
       style={{
-        minHeight: "100vh",
+        height: "100dvh",
+        overflowY: "auto",
+        WebkitOverflowScrolling: "touch",
         background: "#0a0205",
         color: "#f2ece0",
         display: "flex",
@@ -115,6 +121,7 @@ function Admin() {
   const [date, setDate] = useState("")
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [tab, setTab] = useState<"messages" | "moments" | "invitation">("messages")
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -187,6 +194,27 @@ function Admin() {
         </p>
       </header>
 
+      {/* Tabs */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {([["messages", "Messages"], ["moments", "Moments"], ["invitation", "Date invitation"]] as const).map(([k, label]) => (
+          <button
+            key={k}
+            onClick={() => setTab(k)}
+            style={{
+              padding: "10px 18px", borderRadius: 999, cursor: "pointer",
+              fontFamily: "'EB Garamond', serif", fontSize: 14, letterSpacing: "0.02em",
+              background: tab === k ? "linear-gradient(135deg, rgba(138,21,40,0.95), rgba(100,12,28,0.98))" : "rgba(255,255,255,0.04)",
+              border: tab === k ? "1px solid rgba(184,148,74,0.55)" : "1px solid rgba(184,148,74,0.18)",
+              color: tab === k ? "#f2ece0" : "rgba(242,236,224,0.6)",
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "messages" && (
+      <>
       {/* Compose */}
       <form onSubmit={add} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <textarea
@@ -260,11 +288,115 @@ function Admin() {
           ))}
         </section>
       )}
+      </>
+      )}
 
-      <div style={{ height: 1, background: "rgba(184,148,74,0.14)", margin: "8px 0" }} />
-
-      <MomentsAdmin />
+      {tab === "moments" && <MomentsAdmin />}
+      {tab === "invitation" && <InvitationsAdmin />}
     </div>
+  )
+}
+
+// ── Date invitations: invite her on a date; see if she accepts or proposes a time ──
+function InvitationsAdmin() {
+  const [items, setItems]       = useState<DateInvitation[]>([])
+  const [message, setMessage]   = useState("")
+  const [location, setLocation] = useState("")
+  const [proposedFor, setProposedFor] = useState("")
+  const [appearOn, setAppearOn] = useState("")
+  const [saving, setSaving]     = useState(false)
+  const [error, setError]       = useState<string | null>(null)
+
+  const reload = useCallback(async () => {
+    try { setItems(await fetchDateInvitations()); setError(null) }
+    catch { setError("Could not load invitations.") }
+  }, [])
+  useEffect(() => { reload() }, [reload])
+
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!message.trim()) { setError("Write the invitation message."); return }
+    setSaving(true)
+    try {
+      await createDateInvitation({
+        message,
+        location,
+        proposed_for: proposedFor ? new Date(proposedFor).toISOString() : null,
+        scheduled_for: appearOn || null,
+      })
+      setMessage(""); setLocation(""); setProposedFor(""); setAppearOn("")
+      await reload()
+    } catch {
+      setError("Could not save. Make sure the date_invitations table exists.")
+    } finally { setSaving(false) }
+  }
+
+  const remove = async (id: string) => {
+    try { await deleteDateInvitation(id); setItems((p) => p.filter((m) => m.id !== id)) }
+    catch { setError("Could not delete that invitation.") }
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%", padding: "11px 14px", borderRadius: 12,
+    background: "rgba(255,255,255,0.04)", border: "1px solid rgba(184,148,74,0.22)",
+    color: "#f2ece0", fontFamily: "'EB Garamond', serif", fontSize: 15, outline: "none",
+  }
+
+  const fmt = (iso: string | null) => {
+    if (!iso) return ""
+    const d = new Date(iso)
+    return isNaN(d.getTime()) ? "" : d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+  }
+
+  return (
+    <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <span className="t-label" style={{ fontSize: 9, letterSpacing: "0.3em", color: "rgba(184,148,74,0.6)" }}>
+          Invite her on a date
+        </span>
+        <span style={{ fontSize: 12, color: "rgba(242,236,224,0.4)", fontFamily: "'EB Garamond', serif" }}>
+          Appears as a sealed invitation she can accept — or propose another time.
+        </span>
+      </div>
+
+      <form onSubmit={add} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Will you let me take you to dinner?" rows={2} style={inputStyle} />
+        <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Place — or a little secret / hint (optional)" style={inputStyle} />
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <label style={{ flex: 1, minWidth: 150, fontSize: 12, color: "rgba(242,236,224,0.55)", fontFamily: "'EB Garamond', serif" }}>
+            Proposed time
+            <input type="datetime-local" value={proposedFor} onChange={(e) => setProposedFor(e.target.value)} style={{ ...inputStyle, marginTop: 4 }} />
+          </label>
+          <label style={{ flex: 1, minWidth: 130, fontSize: 12, color: "rgba(242,236,224,0.55)", fontFamily: "'EB Garamond', serif" }}>
+            Appears on
+            <input type="date" value={appearOn} onChange={(e) => setAppearOn(e.target.value)} style={{ ...inputStyle, marginTop: 4 }} />
+          </label>
+        </div>
+        {error && <span style={{ color: "#e07a8a", fontSize: 13 }}>{error}</span>}
+        <button type="submit" disabled={saving} style={{ padding: "11px", borderRadius: 999, background: "linear-gradient(135deg, rgba(138,21,40,0.9), rgba(100,12,28,0.95))", border: "1px solid rgba(184,148,74,0.28)", color: "#f2ece0", fontFamily: "'EB Garamond', serif", fontSize: 15, cursor: "pointer", opacity: saving ? 0.6 : 1 }}>
+          {saving ? "Saving…" : "Send invitation"}
+        </button>
+      </form>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {items.map((m) => (
+          <div key={m.id} style={{ borderRadius: 12, padding: "12px 14px", background: "rgba(255,255,255,0.025)", border: "1px solid rgba(184,148,74,0.16)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
+              <p style={{ fontFamily: "'EB Garamond', serif", fontSize: 14, color: "rgba(242,236,224,0.85)" }}>{m.message}</p>
+              <button onClick={() => remove(m.id)} style={{ background: "none", border: "none", color: "#e07a8a", cursor: "pointer", fontSize: 12, flexShrink: 0 }}>Delete</button>
+            </div>
+            <p style={{ fontSize: 11, color: "rgba(242,236,224,0.4)", marginTop: 4 }}>
+              {m.proposed_for ? `Proposed ${fmt(m.proposed_for)}` : "No time set"}{m.location ? ` · ${m.location}` : ""}{m.scheduled_for ? ` · appears ${m.scheduled_for}` : ""}
+            </p>
+            <p style={{ fontSize: 12, marginTop: 6, color: m.status === "accepted" ? "#7bd88f" : m.status === "counter" ? "#e8c882" : "rgba(242,236,224,0.35)" }}>
+              {m.status === "accepted" && "✓ She accepted 💛"}
+              {m.status === "counter" && `↩ She proposed: ${fmt(m.response_time)}${m.response_note ? ` — “${m.response_note}”` : ""}`}
+              {m.status === "pending" && "… awaiting her answer"}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 

@@ -19,6 +19,7 @@ export function CarePanel() {
   const triggerBloom    = useSceneStore((s) => s.triggerBloom)
   const setDomeLifted   = useSceneStore((s) => s.setDomeLifted)
   const setActiveMoment = useSceneStore((s) => s.setActiveMoment)
+  const setActiveInvitation = useSceneStore((s) => s.setActiveInvitation)
 
   const [done, setDone] = useState(false)
   const [milestone, setMilestone] = useState<MilestoneInfo | null>(null)
@@ -44,6 +45,7 @@ export function CarePanel() {
       setFirstVisit(result.isFirstToday)
       setMilestone(result.milestone)
       if (result.moment) setActiveMoment(result.moment)
+      if (result.invitation) setActiveInvitation(result.invitation)
       queryClient.invalidateQueries({ queryKey: ["rose-state"] })
 
       if (result.isFirstToday) {
