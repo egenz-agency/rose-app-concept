@@ -16,6 +16,7 @@ import { GrowthSimulator } from "@/components/ui/GrowthSimulator"
 import { MissedDayPreview } from "@/components/ui/MissedDayPreview"
 import { MomentPanel } from "@/components/ui/MomentPanel"
 import { InvitationPanel } from "@/components/ui/InvitationPanel"
+import { StreakBadge } from "@/components/ui/StreakBadge"
 import { HoldRing } from "@/components/ui/HoldRing"
 import { ViewControls } from "@/components/ui/ViewControls"
 import { SceneErrorBoundary } from "@/components/scene/SceneErrorBoundary"
@@ -196,6 +197,7 @@ function ExperienceInner() {
       <MissedDayPreview />
       <ViewControls />
 
+      <StreakBadge />
       {phase === "IDLE" && <IdleHint />}
     </div>
   )
