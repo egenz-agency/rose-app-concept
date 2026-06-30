@@ -6,6 +6,7 @@ import { differenceInCalendarDays, parseISO } from "date-fns"
 import { fetchScheduledMessages, type ScheduledMessage } from "@/lib/supabase/queries"
 import { useSceneStore } from "@/lib/store/sceneStore"
 import { TRANSITION_PANEL, TRANSITION_STAGGER, TRANSITION_ITEM } from "@/lib/animation/easings"
+import { LetterPaper, RoseCrest, LetterDivider } from "./LetterPaper"
 
 // Letters = the scheduled messages the owner wrote. Delivered ones are kept here
 // to be re-read; upcoming ones are locked and show how many days until they open.
@@ -94,19 +95,23 @@ export function LettersPanel() {
                 {selected ? (
                   // ── Reading view (cream letter) ──────────────────────────
                   <motion.div initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={TRANSITION_ITEM}>
-                    <div style={{ background: "linear-gradient(168deg, #f6eeda, #efe3c8)", borderRadius: 12, padding: "26px 24px", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6)" }}>
-                      {selected.scheduled_for && (
-                        <p style={{ fontFamily: "'EB Garamond', serif", fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", color: "rgba(120,30,45,0.5)", marginBottom: 14 }}>
-                          {selected.scheduled_for}
-                        </p>
-                      )}
-                      <p style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 20, lineHeight: 1.6, color: "#3a2418", whiteSpace: "pre-wrap" }}>
+                    <LetterPaper maxHeight="62dvh">
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                        <RoseCrest />
+                        {selected.scheduled_for && (
+                          <p style={{ fontFamily: "'EB Garamond', serif", fontSize: 10, letterSpacing: "0.24em", textTransform: "uppercase", color: "rgba(120,30,45,0.5)" }}>
+                            {selected.scheduled_for}
+                          </p>
+                        )}
+                      </div>
+                      <p style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 20, lineHeight: 1.6, color: "#3a2418", whiteSpace: "pre-wrap", textAlign: "center" }}>
                         {selected.message}
                       </p>
-                      <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, color: "#6e1228", textAlign: "right", marginTop: 20 }}>
+                      <div style={{ marginTop: 18 }}><LetterDivider /></div>
+                      <p style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 18, color: "#6e1228", textAlign: "right", marginTop: 10 }}>
                         — {selected.author ?? "Your love"}
                       </p>
-                    </div>
+                    </LetterPaper>
                   </motion.div>
                 ) : (
                   // ── List view ────────────────────────────────────────────

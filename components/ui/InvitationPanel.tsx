@@ -5,6 +5,25 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useSceneStore } from "@/lib/store/sceneStore"
 import { respondToInvitation } from "@/lib/supabase/queries"
 import { Envelope, Flap } from "./MomentPanel"
+import { LetterPaper, RoseCrest, LetterDivider } from "./LetterPaper"
+
+const INK = "#6e1228"
+function CalIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+      <rect x="2" y="3" width="12" height="11" rx="2" stroke={INK} strokeWidth="1.1" />
+      <path d="M2 6.5h12M5.5 2v2M10.5 2v2" stroke={INK} strokeWidth="1.1" strokeLinecap="round" />
+    </svg>
+  )
+}
+function PinIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+      <path d="M8 14s5-4.2 5-8A5 5 0 0 0 3 6c0 3.8 5 8 5 8Z" stroke="#7a3a28" strokeWidth="1.1" />
+      <circle cx="8" cy="6" r="1.7" stroke="#7a3a28" strokeWidth="1.1" />
+    </svg>
+  )
+}
 
 // An interactive date invitation, revealed in the envelope. She can accept the
 // proposed time, or propose another — her answer is written back for the owner.
@@ -94,27 +113,32 @@ export function InvitationPanel() {
               <motion.div
                 initial={{ y: 28, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.25, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-                style={{ position: "relative", background: "linear-gradient(168deg, #f6eeda 0%, #efe3c8 100%)", borderRadius: 14, padding: "30px 26px 26px", boxShadow: "0 30px 70px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.6)", overflowY: "auto", maxHeight: "82dvh" }}
               >
-                <p style={{ fontFamily: "'EB Garamond', serif", fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: "rgba(120,30,45,0.55)", marginBottom: 14 }}>
-                  {invitation.title || "An invitation"}
-                </p>
+                <LetterPaper maxHeight="82dvh">
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 9, marginBottom: 16 }}>
+                  <RoseCrest />
+                  <p style={{ fontFamily: "'EB Garamond', serif", fontSize: 10, letterSpacing: "0.32em", textTransform: "uppercase", color: "rgba(120,30,45,0.6)" }}>
+                    {invitation.title || "An invitation"}
+                  </p>
+                </div>
 
                 {invitation.message && (
-                  <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 21, lineHeight: 1.55, color: "#3a2418", fontStyle: "italic", whiteSpace: "pre-wrap" }}>
+                  <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 21, lineHeight: 1.55, color: "#3a2418", fontStyle: "italic", whiteSpace: "pre-wrap", textAlign: "center" }}>
                     {invitation.message}
                   </p>
                 )}
 
                 {(when || invitation.location) && (
-                  <div style={{ marginTop: 18, padding: "12px 14px", borderRadius: 10, background: "rgba(120,30,45,0.07)", border: "1px solid rgba(120,30,45,0.15)" }}>
-                    {when && <p style={{ fontFamily: "'EB Garamond', serif", fontSize: 15, color: "#6e1228" }}>🗓 {when}</p>}
-                    {invitation.location && <p style={{ fontFamily: "'EB Garamond', serif", fontSize: 14, color: "#7a3a28", marginTop: 4 }}>📍 {invitation.location}</p>}
+                  <div style={{ marginTop: 18, padding: "13px 15px", borderRadius: 10, background: "rgba(120,30,45,0.06)", border: "1px solid rgba(120,30,45,0.14)", display: "flex", flexDirection: "column", gap: 7 }}>
+                    {when && <p style={{ display: "flex", alignItems: "center", gap: 9, fontFamily: "'EB Garamond', serif", fontSize: 15, color: "#6e1228" }}><CalIcon /> {when}</p>}
+                    {invitation.location && <p style={{ display: "flex", alignItems: "center", gap: 9, fontFamily: "'EB Garamond', serif", fontSize: 14, color: "#7a3a28" }}><PinIcon /> {invitation.location}</p>}
                   </div>
                 )}
 
+                <div style={{ marginTop: 20 }}><LetterDivider /></div>
+
                 {/* RSVP */}
-                <div style={{ marginTop: 22 }}>
+                <div style={{ marginTop: 14 }}>
                   {mode === "done" ? (
                     <>
                       <p style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 19, color: "#6e1228", textAlign: "center", marginBottom: 16 }}>
@@ -141,6 +165,7 @@ export function InvitationPanel() {
                     </div>
                   )}
                 </div>
+                </LetterPaper>
               </motion.div>
             </motion.div>
           )}

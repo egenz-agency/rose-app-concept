@@ -13,20 +13,36 @@ const STEPS = [
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.09, delayChildren: 0.35 } } }
 const item    = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.25, 0.46, 0.45, 0.94] } } }
 
+export const INSTRUCTIONS_SEEN_KEY = "rose_instructions_seen"
+
 export function InstructionsPanel() {
-  const phase         = useSceneStore((s) => s.phase)
-  const setPhase      = useSceneStore((s) => s.setPhase)
+  const phase          = useSceneStore((s) => s.phase)
+  const setPhase       = useSceneStore((s) => s.setPhase)
   const setIsEmergence = useSceneStore((s) => s.setIsEmergence)
+  const activePanelId  = useSceneStore((s) => s.activePanelId)
+  const closePanel     = useSceneStore((s) => s.closePanel)
+
+  // Two ways this shows: the first-ever intro (phase INSTRUCTIONS), or re-opened
+  // later as a reminder from the HUD "Guide" button (panel "guide").
+  const isGuide = activePanelId === "guide"
+  const isOpen  = phase === "INSTRUCTIONS" || isGuide
+
+  const begin = () => {
+    try { localStorage.setItem(INSTRUCTIONS_SEEN_KEY, "1") } catch {}
+    setIsEmergence(true)
+    setPhase("IDLE")
+  }
 
   return (
     <AnimatePresence>
-      {phase === "INSTRUCTIONS" && (
+      {isOpen && (
         <motion.div
           className="fixed inset-0 z-40 flex items-center justify-center px-5"
-          style={{ background: "rgba(8, 1, 6, 0.58)" }}
+          style={{ background: "rgba(8, 1, 6, 0.62)", backdropFilter: "blur(2px)" }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.9 } }}
+          onClick={(e) => { if (e.target === e.currentTarget && isGuide) closePanel() }}
         >
           <motion.div
             className="w-full max-w-[360px]"
@@ -37,7 +53,7 @@ export function InstructionsPanel() {
           >
             {/* Double-bezel card */}
             <div className="glass-bezel rounded-[28px]">
-              <div className="glass-bezel-inner rounded-[27px] px-7 py-8 flex flex-col gap-6">
+              <div className="glass-bezel-inner rounded-[27px] flex flex-col gap-7" style={{ padding: "38px 32px" }}>
 
                 {/* Header */}
                 <motion.div
@@ -67,13 +83,13 @@ export function InstructionsPanel() {
 
                   <div className="flex flex-col gap-2">
                     <span className="t-label" style={{ fontSize: "9px", letterSpacing: "0.3em" }}>
-                      An enchanted gift for you
+                      {isGuide ? "How the rose works" : "An enchanted gift for you"}
                     </span>
                     <h1
                       className="t-display glow-crimson"
                       style={{ fontSize: "32px", lineHeight: 1.08 }}
                     >
-                      The rose is yours.
+                      {isGuide ? "A gentle reminder." : "The rose is yours."}
                     </h1>
                     <p className="t-serif" style={{ fontSize: "15px", color: "rgba(242,236,224,0.52)" }}>
                       Care for it each day and it will bloom forever.
@@ -112,8 +128,8 @@ export function InstructionsPanel() {
 
                 {/* CTA */}
                 <motion.button
-                  onClick={() => { setIsEmergence(true); setPhase("IDLE") }}
-                  className="group w-full rounded-full flex items-center justify-between px-6 py-3.5 relative overflow-hidden"
+                  onClick={isGuide ? closePanel : begin}
+                  className="group w-full rounded-full flex items-center justify-between px-6 py-4 relative overflow-hidden"
                   style={{
                     background: "linear-gradient(135deg, rgba(138,21,40,0.9), rgba(100,12,28,0.95))",
                     border: "1px solid rgba(184, 148, 74, 0.28)",
@@ -137,7 +153,7 @@ export function InstructionsPanel() {
                     className="t-serif"
                     style={{ fontSize: "15px", color: "rgba(242,236,224,0.88)", letterSpacing: "0.06em" }}
                   >
-                    Begin the magic
+                    {isGuide ? "Got it" : "Begin the magic"}
                   </span>
 
                   {/* Button-in-button arrow */}

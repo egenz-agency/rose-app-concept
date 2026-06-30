@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useSceneStore } from "@/lib/store/sceneStore"
+import { INSTRUCTIONS_SEEN_KEY } from "./InstructionsPanel"
 
 // Plays after the video ends — grows the rose from bud to bloom
 // before the Instructions panel appears.
@@ -20,6 +21,7 @@ export function RoseReveal() {
   const phase               = useSceneStore((s) => s.phase)
   const setPhase            = useSceneStore((s) => s.setPhase)
   const setSimulationPetals = useSceneStore((s) => s.setSimulationPetals)
+  const setIsEmergence      = useSceneStore((s) => s.setIsEmergence)
 
   const [line, setLine]         = useState<string | null>(null)
   const [exiting, setExiting]   = useState(false)
@@ -59,7 +61,15 @@ export function RoseReveal() {
         setSimulationPetals(null)      // hand back to real petal data
         setExiting(false)
         setLine(null)
-        setPhase("INSTRUCTIONS")
+        // Show the intro only the first time on this device. After that, skip
+        // straight to the rose (with the same emergence reveal).
+        const seen = typeof window !== "undefined" && localStorage.getItem(INSTRUCTIONS_SEEN_KEY) === "1"
+        if (seen) {
+          setIsEmergence(true)
+          setPhase("IDLE")
+        } else {
+          setPhase("INSTRUCTIONS")
+        }
       }, 1400)
     }, GROW_DURATION_MS + 800)
 

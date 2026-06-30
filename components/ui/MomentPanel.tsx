@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useSceneStore } from "@/lib/store/sceneStore"
-import { CloseIcon } from "./Icons"
+import { LetterPaper, RoseCrest, LetterDivider } from "./LetterPaper"
 
 // A scheduled letter/moment, revealed as a wax-sealed envelope that opens: the
 // flap lifts, the letter rises out, and the message is shown on cream paper.
@@ -69,61 +69,51 @@ export function MomentPanel() {
                 initial={{ y: 28, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.25, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-                style={{
-                  position: "relative",
-                  background: "linear-gradient(168deg, #f6eeda 0%, #efe3c8 100%)",
-                  borderRadius: 14,
-                  padding: "30px 26px 26px",
-                  boxShadow: "0 30px 70px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.6)",
-                  overflowY: "auto",
-                  maxHeight: "80dvh",
-                }}
               >
-                <button
-                  onClick={close}
-                  aria-label="Close"
-                  className="shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{ position: "absolute", top: 12, right: 12, background: "rgba(94,15,30,0.08)", border: "1px solid rgba(94,15,30,0.18)", cursor: "pointer" }}
-                >
-                  <CloseIcon size={12} color="rgba(94,15,30,0.6)" />
-                </button>
+                <LetterPaper maxHeight="82dvh">
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 9, marginBottom: 18 }}>
+                    <RoseCrest />
+                    <p style={{ fontFamily: "'EB Garamond', serif", fontSize: 10, letterSpacing: "0.34em", textTransform: "uppercase", color: "rgba(120,30,45,0.6)" }}>
+                      My dearest
+                    </p>
+                  </div>
 
-                <p style={{ fontFamily: "'EB Garamond', serif", fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: "rgba(120,30,45,0.55)", marginBottom: 18 }}>
-                  My dearest
-                </p>
+                  {moment.photo_url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={moment.photo_url} alt="" style={{ width: "100%", borderRadius: 10, marginBottom: 16, border: "1px solid rgba(120,30,45,0.18)" }} />
+                  )}
+                  {moment.video_url && (
+                    <video src={moment.video_url} controls playsInline style={{ width: "100%", borderRadius: 10, marginBottom: 16, background: "#000" }} />
+                  )}
 
-                {moment.photo_url && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={moment.photo_url} alt="" style={{ width: "100%", borderRadius: 10, marginBottom: 16, border: "1px solid rgba(120,30,45,0.18)" }} />
-                )}
-                {moment.video_url && (
-                  <video src={moment.video_url} controls playsInline style={{ width: "100%", borderRadius: 10, marginBottom: 16, background: "#000" }} />
-                )}
+                  {moment.message && (
+                    <p style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 21, lineHeight: 1.62, color: "#3a2418", fontStyle: "italic", whiteSpace: "pre-wrap", textAlign: "center" }}>
+                      {moment.message}
+                    </p>
+                  )}
 
-                {moment.message && (
-                  <p style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 21, lineHeight: 1.6, color: "#3a2418", fontStyle: "italic", whiteSpace: "pre-wrap" }}>
-                    {moment.message}
-                  </p>
-                )}
+                  {moment.title && (
+                    <>
+                      <div style={{ marginTop: 20 }}><LetterDivider /></div>
+                      <p style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 19, color: "#6e1228", textAlign: "right", marginTop: 10 }}>
+                        — {moment.title}
+                      </p>
+                    </>
+                  )}
 
-                {moment.title && (
-                  <p style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 19, color: "#6e1228", textAlign: "right", marginTop: 22 }}>
-                    — {moment.title}
-                  </p>
-                )}
-
-                <button
-                  onClick={close}
-                  className="w-full rounded-full"
-                  style={{
-                    marginTop: hasMedia ? 18 : 26, padding: "12px",
-                    background: "linear-gradient(135deg, #8a1528, #640c1c)",
-                    border: "1px solid rgba(184,148,74,0.4)", color: "#f6eeda",
-                    fontFamily: "'EB Garamond', serif", fontSize: 14, letterSpacing: "0.08em", cursor: "pointer",
-                  }}
-                >
-                  Close
-                </button>
+                  <button
+                    onClick={close}
+                    className="w-full rounded-full"
+                    style={{
+                      marginTop: hasMedia ? 18 : 26, padding: "12px",
+                      background: "linear-gradient(135deg, #8a1528, #640c1c)",
+                      border: "1px solid rgba(184,148,74,0.4)", color: "#f6eeda",
+                      fontFamily: "'EB Garamond', serif", fontSize: 14, letterSpacing: "0.08em", cursor: "pointer",
+                    }}
+                  >
+                    Close
+                  </button>
+                </LetterPaper>
               </motion.div>
             </motion.div>
           )}

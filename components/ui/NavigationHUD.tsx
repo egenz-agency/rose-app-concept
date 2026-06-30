@@ -1,12 +1,13 @@
 "use client"
 import { motion, AnimatePresence } from "framer-motion"
 import { useSceneStore } from "@/lib/store/sceneStore"
-import { RoseIcon, LetterIcon, StarIcon } from "./Icons"
+import { RoseIcon, LetterIcon, StarIcon, ScrollIcon } from "./Icons"
 
 const NAV_ITEMS = [
   { id: "care",         label: "Tend Rose",  Icon: RoseIcon,   phase: "CARING" as const },
   { id: "letters",     label: "Letters",    Icon: LetterIcon, panel: "letters" },
   { id: "memory-stars",label: "Stars",      Icon: StarIcon,   panel: "memory-stars" },
+  { id: "guide",       label: "Guide",      Icon: ScrollIcon, panel: "guide" },
 ]
 
 export function NavigationHUD() {
