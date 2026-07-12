@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next"
 import "./globals.css"
 import { PWARegister } from "@/components/ui/PWARegister"
+import { CookieNotice } from "@/components/ui/CookieNotice"
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || "https://the-enchanted-rose.vercel.app"),
@@ -54,6 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="h-full overflow-hidden">
         <PWARegister />
         {children}
+        <CookieNotice />
       </body>
     </html>
   )

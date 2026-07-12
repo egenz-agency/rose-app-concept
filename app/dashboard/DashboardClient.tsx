@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation"
 import {
   addMessageAction, deleteMessageAction,
   addMomentAction, deleteMomentAction, signOutAction,
-  updateNamesAction, uploadMediaAction, clearMediaAction,
+  updateNamesAction, uploadMediaAction, clearMediaAction, deleteAccountAction,
 } from "./actions"
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -79,10 +79,60 @@ export function DashboardClient({
             />
           ))}
         </Section>
+
+        {/* Danger zone — GDPR right to erasure */}
+        <Section title="Account">
+          <DangerZone />
+        </Section>
+
+        <footer style={{ marginTop: 36, paddingTop: 18, borderTop: "1px solid rgba(184,148,74,0.12)", display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, fontFamily: "'EB Garamond', serif" }}>
+          <a href="/legal/privacy" style={footLink}>Privacy</a>
+          <a href="/legal/terms" style={footLink}>Terms</a>
+          <a href="/legal/cookies" style={footLink}>Cookies</a>
+          <a href="mailto:support@example.com" style={footLink}>Contact</a>
+        </footer>
       </div>
     </div>
   )
 }
+
+function DangerZone() {
+  const router = useRouter()
+  const [confirming, setConfirming] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  return (
+    <div style={{ ...card, borderColor: "rgba(200,60,60,0.28)" }}>
+      <div style={sectionLabel}>Delete account &amp; all data</div>
+      <p style={{ fontSize: 13, color: "rgba(242,236,224,0.5)", fontFamily: "'EB Garamond', serif", marginBottom: 12 }}>
+        Permanently deletes your account, every gift you created, and all uploaded media. This cannot be undone.
+      </p>
+      {!confirming ? (
+        <button onClick={() => setConfirming(true)} style={{ ...smallBtn, color: "#e07a8a", borderColor: "rgba(200,60,60,0.35)" }}>
+          Delete my account
+        </button>
+      ) : (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <button
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true); setError(null)
+              try { await deleteAccountAction(); router.replace("/login") }
+              catch (e) { setError(e instanceof Error ? e.message : "Failed"); setBusy(false) }
+            }}
+            style={{ ...smallBtn, background: "rgba(160,20,30,0.85)", color: "#f6eeda", borderColor: "rgba(200,60,60,0.5)" }}
+          >
+            {busy ? "Deleting…" : "Yes, permanently delete everything"}
+          </button>
+          <button onClick={() => setConfirming(false)} disabled={busy} style={ghostBtn}>Cancel</button>
+        </div>
+      )}
+      {error && <p style={{ color: "#e07a8a", fontSize: 12, marginTop: 8 }}>{error}</p>}
+    </div>
+  )
+}
+
+const footLink: React.CSSProperties = { color: "rgba(242,236,224,0.5)", textDecoration: "none" }
 
 function momentWhen(m: Row): string {
   if (m.repeat_every) return `every ${m.repeat_every} visits`

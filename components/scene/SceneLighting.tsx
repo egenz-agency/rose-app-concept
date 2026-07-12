@@ -52,10 +52,12 @@ export function SceneLighting() {
       <pointLight position={[2.2, 2.4, 4.5]} color="#fff1dc" intensity={15} distance={16} decay={2} />
       <pointLight position={[-1.8, 1.8, 2.2]} color="#ffe6cf" intensity={12} distance={9} decay={2} />
 
-      {/* Environment map for glass refraction + metal reflections.
-          Isolated in its own Suspense so a slow HDR fetch can never blank the scene. */}
+      {/* Environment map for glass refraction + metal reflections. Self-hosted
+          (not a third-party CDN preset) so it works under our CSP and never
+          depends on an external host being up. Own Suspense so a slow load can
+          never blank the scene. */}
       <Suspense fallback={null}>
-        <Environment preset="night" />
+        <Environment files="/hdri/dikhololo_night_1k.hdr" />
       </Suspense>
     </>
   )

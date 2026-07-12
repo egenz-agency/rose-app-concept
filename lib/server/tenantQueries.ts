@@ -336,11 +336,21 @@ export async function fetchMemoryStars(tenantId: string): Promise<StarRow[]> {
   return (data ?? []) as StarRow[]
 }
 
+const MAX_STARS_PER_TENANT = 300
+
 export async function createMemoryStar(
   tenantId: string,
   star: { title: string; date: string; memory: string; photos: string[]; position: [number, number, number] }
 ): Promise<StarRow> {
   const sb = getAdminClient()
+  // Hard ceiling so a gift can never accumulate unbounded rows.
+  const { count } = await sb
+    .from("memory_stars")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+  if ((count ?? 0) >= MAX_STARS_PER_TENANT) {
+    throw new Error("This constellation is full.")
+  }
   const { data, error } = await sb
     .from("memory_stars")
     .insert({

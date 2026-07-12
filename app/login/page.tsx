@@ -81,6 +81,12 @@ export default function LoginPage() {
 
         {msg && <p style={{ color: "rgba(232,200,130,0.9)", fontSize: 13, textAlign: "center", marginTop: 14 }}>{msg}</p>}
         {error && <p style={{ color: "#e58", fontSize: 13, textAlign: "center", marginTop: 14 }}>{error}</p>}
+
+        <p style={{ marginTop: 26, textAlign: "center", fontSize: 12, lineHeight: 1.6, color: "rgba(242,236,224,0.4)", fontFamily: "'EB Garamond', serif" }}>
+          By continuing you agree to our{" "}
+          <a href="/legal/terms" style={{ color: "rgba(232,200,130,0.7)" }}>Terms</a> and{" "}
+          <a href="/legal/privacy" style={{ color: "rgba(232,200,130,0.7)" }}>Privacy Policy</a>.
+        </p>
       </div>
     </div>
   )

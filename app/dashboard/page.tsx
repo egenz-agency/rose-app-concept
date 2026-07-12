@@ -1,9 +1,11 @@
+import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { getSaasServerClient, getCurrentUser } from "@/lib/supabase/saasServer"
 import { CreateGift } from "./CreateGift"
 import { DashboardClient } from "./DashboardClient"
 
 export const dynamic = "force-dynamic"
+export const metadata: Metadata = { robots: { index: false, follow: false } }
 
 // The authenticated buyer dashboard. Auth-gated; replaces the shared "thebeauty"
 // /rosesecret for the productized gift. RLS scopes every query to the buyer.

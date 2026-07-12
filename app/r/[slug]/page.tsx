@@ -1,6 +1,10 @@
+import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 import { getTenantBySlug } from "@/lib/server/tenantQueries"
 import { ExperiencePage } from "@/app/experience/ExperiencePage"
+
+// Private gift — never index or follow.
+export const metadata: Metadata = { robots: { index: false, follow: false } }
 
 // The public gift page for one couple. The slug resolves to a tenant on the
 // server; an unknown or suspended gift 404s. The experience then runs in
