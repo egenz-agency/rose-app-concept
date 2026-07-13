@@ -10,6 +10,10 @@ import { DustParticles } from "./DustParticles"
 import { MagicSparkles } from "./MagicSparkles"
 import { PostProcessing } from "./PostProcessing"
 import { MemoryStarField } from "./MemoryStarField"
+import { silenceRapierDeprecation } from "@/lib/scene/silenceRapierDeprecation"
+
+// Drop the one noisy (harmless) Rapier init deprecation before <Physics> mounts.
+silenceRapierDeprecation()
 
 interface SceneRootProps {
   onDomePointerDown?: () => void
