@@ -1,12 +1,15 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import type { Database } from "@/types/database"
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config"
 
 export async function getSupabaseServer() {
   const cookieStore = await cookies()
+  // Pinned to enchanted-rose via config.ts (not process.env) so the rose-saas
+  // Supabase integration's injected NEXT_PUBLIC_SUPABASE_URL can't repoint main.
   return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY,
     {
       cookies: {
         getAll: () => cookieStore.getAll(),
