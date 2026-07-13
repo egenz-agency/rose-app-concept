@@ -19,6 +19,14 @@ import {
 const PASSWORD = "thebeauty"
 const SESSION_KEY = "rosesecret_unlocked"
 
+// Surface the real Supabase/PostgREST error instead of a hard-coded guess.
+function errText(e: unknown): string {
+  if (e && typeof e === "object" && "message" in e) {
+    return String((e as { message?: unknown }).message)
+  }
+  return String(e)
+}
+
 export default function RoseSecretPage() {
   const [unlocked, setUnlocked] = useState(false)
   const [pw, setPw] = useState("")
@@ -128,8 +136,8 @@ function Admin() {
     try {
       setItems(await fetchScheduledMessages())
       setError(null)
-    } catch {
-      setError("Could not load messages. Is the database reachable?")
+    } catch (e) {
+      setError(`Could not load messages: ${errText(e)}`)
     } finally {
       setLoading(false)
     }
@@ -149,8 +157,8 @@ function Admin() {
       })
       setMessage(""); setAuthor(""); setDate("")
       await reload()
-    } catch {
-      setError("Could not save. Check the database connection.")
+    } catch (e) {
+      setError(`Could not save: ${errText(e)}`)
     } finally {
       setSaving(false)
     }
@@ -160,8 +168,8 @@ function Admin() {
     try {
       await deleteScheduledMessage(id)
       setItems((prev) => prev.filter((m) => m.id !== id))
-    } catch {
-      setError("Could not delete that message.")
+    } catch (e) {
+      setError(`Could not delete that message: ${errText(e)}`)
     }
   }
 
@@ -309,7 +317,7 @@ function InvitationsAdmin() {
 
   const reload = useCallback(async () => {
     try { setItems(await fetchDateInvitations()); setError(null) }
-    catch { setError("Could not load invitations.") }
+    catch (e) { setError(`Could not load invitations: ${errText(e)}`) }
   }, [])
   useEffect(() => { reload() }, [reload])
 
@@ -326,14 +334,14 @@ function InvitationsAdmin() {
       })
       setMessage(""); setLocation(""); setProposedFor(""); setAppearOn("")
       await reload()
-    } catch {
-      setError("Could not save. Make sure the date_invitations table exists.")
+    } catch (e) {
+      setError(`Could not save: ${errText(e)}`)
     } finally { setSaving(false) }
   }
 
   const remove = async (id: string) => {
     try { await deleteDateInvitation(id); setItems((p) => p.filter((m) => m.id !== id)) }
-    catch { setError("Could not delete that invitation.") }
+    catch (e) { setError(`Could not delete that invitation: ${errText(e)}`) }
   }
 
   const inputStyle: React.CSSProperties = {
@@ -419,7 +427,7 @@ function MomentsAdmin() {
   const reload = useCallback(async () => {
     setLoading(true)
     try { setItems(await fetchMoments()); setError(null) }
-    catch { setError("Could not load moments. Is the database reachable?") }
+    catch (e) { setError(`Could not load moments: ${errText(e)}`) }
     finally { setLoading(false) }
   }, [])
   useEffect(() => { reload() }, [reload])
@@ -430,8 +438,8 @@ function MomentsAdmin() {
     try {
       const url = await uploadMomentFile(file)
       if (kind === "photo") setPhotoUrl(url); else setVideoUrl(url)
-    } catch {
-      setError("Upload failed. Run migration 005 (the 'moments' storage bucket) in Supabase.")
+    } catch (e) {
+      setError(`Upload failed: ${errText(e)}`)
     } finally { setUploading(null) }
   }
 
@@ -452,14 +460,14 @@ function MomentsAdmin() {
       })
       setTitle(""); setMessage(""); setPhotoUrl(""); setVideoUrl(""); setVisit(""); setDate(""); setRepeat("")
       await reload()
-    } catch {
-      setError("Could not save. Make sure migration 005 has been run in Supabase.")
+    } catch (e) {
+      setError(`Could not save: ${errText(e)}`)
     } finally { setSaving(false) }
   }
 
   const remove = async (id: string) => {
     try { await deleteMoment(id); setItems((p) => p.filter((m) => m.id !== id)) }
-    catch { setError("Could not delete that moment.") }
+    catch (e) { setError(`Could not delete that moment: ${errText(e)}`) }
   }
 
   const inputStyle: React.CSSProperties = {
