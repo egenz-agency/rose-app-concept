@@ -1,7 +1,6 @@
 "use server"
 
 import {
-  getTenantBySlug,
   fetchRoseState as srvFetchRoseState,
   recordVisit as srvRecordVisit,
   reviveRose as srvReviveRose,
@@ -10,19 +9,17 @@ import {
   fetchLetters as srvFetchLetters,
   fetchGalleryPhotos as srvFetchGalleryPhotos,
 } from "@/lib/server/tenantQueries"
+import { getAccessibleTenant } from "@/lib/security/giftAccess"
 import { cleanText, cleanDate, cleanHttpUrl, LIMITS } from "@/lib/security/validate"
 import { enforceRateLimit, clientIp } from "@/lib/security/ratelimit"
 
 // Resolve a gift slug → tenant_id on the server. This is the ONLY place the slug
-// becomes a tenant_id; the browser can never address another couple's data. The
-// slug is shape-validated before it ever touches the database.
+// becomes a tenant_id; the browser can never address another couple's data.
+// getAccessibleTenant also enforces the secret access-token cookie, so a slug
+// alone — without the token the recipient was given — resolves to nothing.
 async function tenantIdFor(slug: string): Promise<string> {
-  if (typeof slug !== "string" || slug.length === 0 || slug.length > LIMITS.slug || !/^[a-z0-9-]+$/.test(slug)) {
-    throw new Error("This gift does not exist")
-  }
-  const tenant = await getTenantBySlug(slug)
+  const tenant = await getAccessibleTenant(slug)
   if (!tenant) throw new Error("This gift does not exist")
-  if (tenant.status === "suspended") throw new Error("This gift is no longer available")
   return tenant.id
 }
 

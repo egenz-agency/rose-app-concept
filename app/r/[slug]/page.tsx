@@ -1,22 +1,39 @@
 import type { Metadata } from "next"
-import { notFound } from "next/navigation"
-import { getTenantBySlug } from "@/lib/server/tenantQueries"
+import { redirect } from "next/navigation"
+import { getAccessibleTenant, readGiftCookie } from "@/lib/security/giftAccess"
 import { ExperiencePage } from "@/app/experience/ExperiencePage"
 
 // Private gift — never index or follow.
-export const metadata: Metadata = { robots: { index: false, follow: false } }
+// The per-gift manifest link is added only when the caller holds the access
+// cookie, and it carries the token so the installed PWA stays scoped to this gift.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}): Promise<Metadata> {
+  const { slug } = await params
+  const base: Metadata = { robots: { index: false, follow: false } }
+  const token = /^[a-z0-9-]{1,64}$/.test(slug) ? await readGiftCookie(slug) : null
+  if (!token) return base
+  return {
+    ...base,
+    title: "A gift for you 🌹",
+    manifest: `/r/${slug}/manifest.webmanifest?k=${encodeURIComponent(token)}`,
+  }
+}
 
-// The public gift page for one couple. The slug resolves to a tenant on the
-// server; an unknown or suspended gift 404s. The experience then runs in
-// tenant mode (all data calls go through the secured server actions).
+// The public gift page for one couple. Access requires the secret token cookie
+// (set by /g/[token]); without it the gift is treated as unavailable — a slug
+// alone reveals nothing. The experience then runs in tenant mode (all data calls
+// go through the secured server actions, which enforce the same token).
 export default async function GiftPage({
   params,
 }: {
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
-  const tenant = await getTenantBySlug(slug)
-  if (!tenant || tenant.status === "suspended") notFound()
+  const tenant = await getAccessibleTenant(slug)
+  if (!tenant) redirect("/gift-unavailable")
 
   const c = tenant.customization ?? {}
   return (

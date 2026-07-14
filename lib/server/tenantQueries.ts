@@ -49,16 +49,30 @@ export interface TenantRecord {
   status: string
   recipient_name: string | null
   giver_name: string | null
+  access_token: string
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   customization: Record<string, any>
 }
+
+const TENANT_COLS = "id, slug, status, recipient_name, giver_name, access_token, customization"
 
 export async function getTenantBySlug(slug: string): Promise<TenantRecord | null> {
   const sb = getAdminClient()
   const { data } = await sb
     .from("tenants")
-    .select("id, slug, status, recipient_name, giver_name, customization")
+    .select(TENANT_COLS)
     .eq("slug", slug)
+    .single()
+  return (data as TenantRecord) ?? null
+}
+
+// Resolve a gift by its secret access token (the value carried in the share link).
+export async function getTenantByToken(token: string): Promise<TenantRecord | null> {
+  const sb = getAdminClient()
+  const { data } = await sb
+    .from("tenants")
+    .select(TENANT_COLS)
+    .eq("access_token", token)
     .single()
   return (data as TenantRecord) ?? null
 }

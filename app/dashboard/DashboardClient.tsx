@@ -14,7 +14,8 @@ export function DashboardClient({
   tenant, messages, moments, email,
 }: { tenant: Row; messages: Row[]; moments: Row[]; email: string }) {
   const router = useRouter()
-  const giftPath = `/r/${tenant.slug}`
+  // Private capability link: carries the secret token, not the guessable slug.
+  const giftPath = `/g/${tenant.access_token}`
   const [copied, setCopied] = useState(false)
 
   const copyLink = () => {
@@ -47,6 +48,9 @@ export function DashboardClient({
             <button onClick={copyLink} style={smallBtn}>{copied ? "Copied!" : "Copy"}</button>
             <a href={giftPath} target="_blank" rel="noreferrer" style={{ ...smallBtn, textDecoration: "none" }}>Open</a>
           </div>
+          <p style={{ margin: "10px 0 0", fontSize: 12, lineHeight: 1.5, color: "rgba(242,236,224,0.45)", fontFamily: "'EB Garamond', serif" }}>
+            This is a private link — only the person you send it to can open the gift. Keep it just between you two. On her phone she can add it to her home screen to install it like an app.
+          </p>
         </div>
 
         {/* Customize */}
