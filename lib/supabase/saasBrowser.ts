@@ -1,5 +1,6 @@
 "use client"
 import { createBrowserClient } from "@supabase/ssr"
+import { ROSE_SAAS_URL, ROSE_SAAS_ANON_KEY } from "./roseSaasPublic"
 
 // Browser client for rose-saas, used only for buyer auth actions on the client
 // (request magic link, sign out, read current session). All real data access
@@ -8,10 +9,7 @@ let client: ReturnType<typeof createBrowserClient> | null = null
 
 export function getSaasBrowserClient() {
   if (!client) {
-    client = createBrowserClient(
-      process.env.NEXT_PUBLIC_ROSE_SAAS_URL!,
-      process.env.NEXT_PUBLIC_ROSE_SAAS_ANON_KEY!
-    )
+    client = createBrowserClient(ROSE_SAAS_URL, ROSE_SAAS_ANON_KEY)
   }
   return client
 }

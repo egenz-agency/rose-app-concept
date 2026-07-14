@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
+import { ROSE_SAAS_URL, ROSE_SAAS_ANON_KEY } from "./roseSaasPublic"
 
 // Cookie-bound server client for the AUTHENTICATED buyer dashboard on rose-saas.
 // Unlike admin.ts (service role, bypasses RLS), this carries the buyer's session,
@@ -8,8 +9,8 @@ import { cookies } from "next/headers"
 export async function getSaasServerClient() {
   const cookieStore = await cookies()
   return createServerClient(
-    process.env.NEXT_PUBLIC_ROSE_SAAS_URL!,
-    process.env.NEXT_PUBLIC_ROSE_SAAS_ANON_KEY!,
+    ROSE_SAAS_URL,
+    ROSE_SAAS_ANON_KEY,
     {
       cookies: {
         getAll: () => cookieStore.getAll(),
