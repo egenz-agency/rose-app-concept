@@ -15,6 +15,7 @@ import {
   type Moment,
   type DateInvitation,
 } from "@/lib/supabase/queries"
+import { MissYouButton } from "@/components/ui/MissYouButton"
 
 const PASSWORD = "thebeauty"
 const SESSION_KEY = "rosesecret_unlocked"
@@ -201,6 +202,26 @@ function Admin() {
           Anything you schedule here will greet her when she next tends the rose. Leave the date empty to show it on her very next visit, or pick a date to save it for a special day.
         </p>
       </header>
+
+      {/* Reach for her — the "I miss you" ping, right at the top */}
+      <div
+        style={{
+          display: "flex", flexDirection: "column", gap: 14,
+          padding: "22px 22px 24px", borderRadius: 20,
+          background: "linear-gradient(160deg, rgba(40,6,16,0.65), rgba(20,3,9,0.55))",
+          border: "1px solid rgba(184,148,74,0.22)",
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <span className="t-label" style={{ fontSize: 9, letterSpacing: "0.3em", color: "rgba(184,148,74,0.6)" }}>
+            Across the distance
+          </span>
+          <h2 className="t-display" style={{ fontSize: 22, fontStyle: "italic", color: "rgba(242,236,224,0.92)" }}>
+            Let her know you miss her
+          </h2>
+        </div>
+        <MissYouButton variant="inline" />
+      </div>
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

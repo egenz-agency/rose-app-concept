@@ -14,7 +14,7 @@ import {
 // screen gets one warm buzz, not forty. This is how long we wait for more taps.
 const BATCH_MS = 3500
 
-export function MissYouButton() {
+export function MissYouButton({ variant = "floating" }: { variant?: "floating" | "inline" }) {
   const phase = useSceneStore((s) => s.phase)
 
   const [mounted, setMounted] = useState(false)
@@ -83,7 +83,155 @@ export function MissYouButton() {
     }
   }
 
-  if (!mounted || !supported || phase !== "IDLE") return null
+  if (!mounted) return null
+
+  // Shared first-run enable modal — used by both variants.
+  const enablePanel = (
+    <AnimatePresence>
+      {showEnable && (
+        <motion.div
+          className="fixed inset-0 z-[60] flex items-center justify-center px-6"
+          style={{ background: "rgba(6,1,4,0.72)", backdropFilter: "blur(6px)" }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => !enabling && setShowEnable(false)}
+        >
+          <motion.div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-[360px] rounded-[22px] px-7 py-7 flex flex-col gap-5"
+            style={{
+              background: "rgba(20, 3, 9, 0.94)",
+              border: "1px solid rgba(184,148,74,0.24)",
+              boxShadow: "0 24px 70px rgba(0,0,0,0.6)",
+            }}
+            initial={{ scale: 0.92, y: 16 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.94, y: 12 }}
+            transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+          >
+            <div className="flex flex-col gap-1.5">
+              <span className="t-label" style={{ fontSize: "9px", letterSpacing: "0.26em" }}>
+                Stay close
+              </span>
+              <h2 className="t-display" style={{ fontSize: "23px", fontStyle: "italic", color: "rgba(242,236,224,0.94)" }}>
+                Let them feel it when you miss them
+              </h2>
+              <p className="t-serif" style={{ fontSize: "13.5px", color: "rgba(242,236,224,0.6)", lineHeight: 1.6, marginTop: 4 }}>
+                Tap “I miss you” and a gentle notification reaches their phone. Turn it on so you get theirs too.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="t-label" style={{ fontSize: "8.5px", letterSpacing: "0.24em", color: "rgba(184,148,74,0.7)" }}>
+                Your name
+              </label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Stella"
+                className="rounded-xl px-4 py-3 t-serif"
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  color: "rgba(242,236,224,0.92)",
+                  fontSize: "15px",
+                  outline: "none",
+                }}
+              />
+            </div>
+
+            {enableError && (
+              <p className="t-serif" style={{ fontSize: "12px", color: "rgba(220,90,110,0.9)", lineHeight: 1.5 }}>
+                {enableError}
+              </p>
+            )}
+
+            <div className="flex items-center gap-3 mt-1">
+              <button
+                onClick={() => !enabling && setShowEnable(false)}
+                className="t-label"
+                style={{ fontSize: "10px", letterSpacing: "0.16em", color: "rgba(242,236,224,0.5)", padding: "10px 14px", cursor: "pointer" }}
+              >
+                Not now
+              </button>
+              <button
+                onClick={doEnable}
+                disabled={enabling || !name.trim()}
+                className="flex-1 rounded-full t-label"
+                style={{
+                  fontSize: "10px",
+                  letterSpacing: "0.18em",
+                  color: "rgba(255,248,240,0.95)",
+                  padding: "13px 18px",
+                  background: name.trim() ? "linear-gradient(90deg, rgba(138,21,40,0.95), rgba(184,80,74,0.9))" : "rgba(255,255,255,0.06)",
+                  border: "1px solid rgba(184,148,74,0.3)",
+                  cursor: enabling || !name.trim() ? "default" : "pointer",
+                  opacity: enabling ? 0.7 : 1,
+                }}
+              >
+                {enabling ? "Turning on…" : "Turn on & allow"}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+
+  // ── Inline variant (admin panel) — no scene-phase gate ──────────────────
+  if (variant === "inline") {
+    if (!supported) {
+      return (
+        <p className="t-serif" style={{ fontSize: 13, color: "rgba(242,236,224,0.45)", lineHeight: 1.5 }}>
+          Open this from your installed home-screen app to turn on “I miss you.”
+        </p>
+      )
+    }
+    const subtitle =
+      status === "reaching" ? "Reaching across the distance…"
+      : status === "sent" ? "She'll feel it 💗"
+      : status === "failed" ? "Couldn't send — try again"
+      : enabled ? `On as ${name || "you"} · tap to send her a heart`
+      : "Turn it on to send a heart — and to feel it when she reaches back."
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}>
+        <motion.button
+          onClick={onButton}
+          className="flex items-center gap-3 rounded-full"
+          style={{
+            padding: "14px 24px",
+            background: "linear-gradient(135deg, rgba(138,21,40,0.95), rgba(100,12,28,0.98))",
+            border: "1px solid rgba(184,148,74,0.5)",
+            color: "#f2ece0",
+            cursor: "pointer",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
+          }}
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <motion.span
+            style={{ fontSize: 20, lineHeight: 1, display: "inline-block" }}
+            animate={{ scale: [1, 1.16, 0.98, 1.1, 1] }}
+            transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+            aria-hidden
+          >
+            💗
+          </motion.span>
+          <span className="t-label" style={{ fontSize: 12, letterSpacing: "0.16em" }}>
+            {enabled ? "I miss you" : "Turn on “I miss you”"}
+          </span>
+        </motion.button>
+        <span className="t-serif" style={{ fontSize: 12.5, color: "rgba(242,236,224,0.5)", lineHeight: 1.5 }}>
+          {subtitle}
+        </span>
+        {enablePanel}
+      </div>
+    )
+  }
+
+  // ── Floating variant (rose scene) — only while idle ─────────────────────
+  if (!supported || phase !== "IDLE") return null
 
   return (
     <>
@@ -165,97 +313,7 @@ export function MissYouButton() {
         )}
       </AnimatePresence>
 
-      {/* First-run: name + enable notifications */}
-      <AnimatePresence>
-        {showEnable && (
-          <motion.div
-            className="fixed inset-0 z-[60] flex items-center justify-center px-6"
-            style={{ background: "rgba(6,1,4,0.72)", backdropFilter: "blur(6px)" }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => !enabling && setShowEnable(false)}
-          >
-            <motion.div
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[360px] rounded-[22px] px-7 py-7 flex flex-col gap-5"
-              style={{
-                background: "rgba(20, 3, 9, 0.94)",
-                border: "1px solid rgba(184,148,74,0.24)",
-                boxShadow: "0 24px 70px rgba(0,0,0,0.6)",
-              }}
-              initial={{ scale: 0.92, y: 16 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.94, y: 12 }}
-              transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-            >
-              <div className="flex flex-col gap-1.5">
-                <span className="t-label" style={{ fontSize: "9px", letterSpacing: "0.26em" }}>
-                  Stay close
-                </span>
-                <h2 className="t-display" style={{ fontSize: "23px", fontStyle: "italic", color: "rgba(242,236,224,0.94)" }}>
-                  Let them feel it when you miss them
-                </h2>
-                <p className="t-serif" style={{ fontSize: "13.5px", color: "rgba(242,236,224,0.6)", lineHeight: 1.6, marginTop: 4 }}>
-                  Tap “I miss you” and a gentle notification reaches their phone. Turn it on so you get theirs too.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="t-label" style={{ fontSize: "8.5px", letterSpacing: "0.24em", color: "rgba(184,148,74,0.7)" }}>
-                  Your name
-                </label>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Stella"
-                  className="rounded-xl px-4 py-3 t-serif"
-                  style={{
-                    background: "rgba(255,255,255,0.04)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    color: "rgba(242,236,224,0.92)",
-                    fontSize: "15px",
-                    outline: "none",
-                  }}
-                />
-              </div>
-
-              {enableError && (
-                <p className="t-serif" style={{ fontSize: "12px", color: "rgba(220,90,110,0.9)", lineHeight: 1.5 }}>
-                  {enableError}
-                </p>
-              )}
-
-              <div className="flex items-center gap-3 mt-1">
-                <button
-                  onClick={() => !enabling && setShowEnable(false)}
-                  className="t-label"
-                  style={{ fontSize: "10px", letterSpacing: "0.16em", color: "rgba(242,236,224,0.5)", padding: "10px 14px", cursor: "pointer" }}
-                >
-                  Not now
-                </button>
-                <button
-                  onClick={doEnable}
-                  disabled={enabling || !name.trim()}
-                  className="flex-1 rounded-full t-label"
-                  style={{
-                    fontSize: "10px",
-                    letterSpacing: "0.18em",
-                    color: "rgba(255,248,240,0.95)",
-                    padding: "13px 18px",
-                    background: name.trim() ? "linear-gradient(90deg, rgba(138,21,40,0.95), rgba(184,80,74,0.9))" : "rgba(255,255,255,0.06)",
-                    border: "1px solid rgba(184,148,74,0.3)",
-                    cursor: enabling || !name.trim() ? "default" : "pointer",
-                    opacity: enabling ? 0.7 : 1,
-                  }}
-                >
-                  {enabling ? "Turning on…" : "Turn on & allow"}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {enablePanel}
     </>
   )
 }
