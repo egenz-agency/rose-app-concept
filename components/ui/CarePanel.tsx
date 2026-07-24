@@ -13,7 +13,7 @@ export function CarePanel() {
   const setRose         = useSceneStore((s) => s.setRose)
   const setDailyMessage = useSceneStore((s) => s.setDailyMessage)
   const setFirstVisit   = useSceneStore((s) => s.setFirstVisitToday)
-  const addFallenPetal  = useSceneStore((s) => s.addFallenPetal)
+  const setFallenPetals = useSceneStore((s) => s.setFallenPetals)
   const dailyMessage    = useSceneStore((s) => s.dailyMessage)
   const isFirstToday    = useSceneStore((s) => s.isFirstVisitToday)
   const triggerBloom    = useSceneStore((s) => s.triggerBloom)
@@ -48,14 +48,12 @@ export function CarePanel() {
       if (result.invitation) setActiveInvitation(result.invitation)
       queryClient.invalidateQueries({ queryKey: ["rose-state"] })
 
+      // Caring for the rose clears the fallen petals from the dome floor.
+      setFallenPetals([])
+
       if (result.isFirstToday) {
         // Trigger 3D bloom animation
         triggerBloom()
-        // Drop petals for missed days
-        const diff = petals - result.rose.petalsRemaining
-        for (let i = 0; i < diff; i++) {
-          setTimeout(() => addFallenPetal(petals - 1 - i), i * 700)
-        }
       }
 
       if (result.rose.isDead) {

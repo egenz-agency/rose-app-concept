@@ -7,6 +7,7 @@ import * as THREE from "three"
 import { gsap } from "gsap"
 import { useSceneStore } from "@/lib/store/sceneStore"
 import { PetalParticles } from "./PetalParticles"
+import { SafeSceneChild } from "./SafeSceneChild"
 
 interface RoseDomeProps {
   onDomePointerDown?: () => void
@@ -221,7 +222,9 @@ export function RoseDome({ onDomePointerDown, onDomePointerUp }: RoseDomeProps) 
           size; only the rose mesh scales with growth (handled in an effect). */}
       <primitive object={clonedScene} scale={SCENE_SCALE} />
 
-      <PetalParticles />
+      <SafeSceneChild>
+        <PetalParticles />
+      </SafeSceneChild>
 
       {/* Invisible hit target for press-and-hold pointer events.
           Persists after the dome is removed so holding the bare rose still works.

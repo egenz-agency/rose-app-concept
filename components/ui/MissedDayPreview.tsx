@@ -3,40 +3,38 @@ import { useState, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useSceneStore } from "@/lib/store/sceneStore"
 
-// A non-destructive preview: drops a single petal from the rose so you can see
-// exactly what happens when a day is missed (Beauty-&-the-Beast style), then
-// quietly restores the rose. Nothing is saved.
+const MAX_PETALS = 40
+
+// A hands-on preview of the "a petal falls each hour" mechanic: every press
+// drops one more petal onto the glass-dome floor, so pressing repeatedly lets
+// you watch them accumulate without waiting real hours. Once all 40 have
+// fallen, the next press clears the floor and starts over. Nothing is saved.
 export function MissedDayPreview() {
   const phase          = useSceneStore((s) => s.phase)
-  const rose           = useSceneStore((s) => s.rose)
   const petalsFallen   = useSceneStore((s) => s.petalsFallen)
   const addFallenPetal = useSceneStore((s) => s.addFallenPetal)
   const setFallenPetals = useSceneStore((s) => s.setFallenPetals)
 
-  const [busy, setBusy]   = useState(false)
-  const [caption, setCaption] = useState(false)
-  const resetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [caption, setCaption] = useState<null | "fall" | "reset">(null)
+  const captionRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const isVisible = phase === "IDLE"
-  const realFallen = Math.max(0, 40 - (rose?.petalsRemaining ?? 40))
+  const allFallen = petalsFallen.length >= MAX_PETALS
 
   const preview = useCallback(() => {
-    if (busy) return
-    setBusy(true)
-    setCaption(true)
-
-    // Drop the next petal — a real falling-leaf animation in the 3D scene
-    const next = petalsFallen.length
-    if (next < 40) addFallenPetal(next)
-
-    // Restore the rose to its true state after the petal has drifted away
-    if (resetRef.current) clearTimeout(resetRef.current)
-    resetRef.current = setTimeout(() => {
-      setFallenPetals(Array.from({ length: realFallen }, (_, i) => i))
-      setBusy(false)
-      setCaption(false)
-    }, 6500)
-  }, [busy, petalsFallen.length, addFallenPetal, setFallenPetals, realFallen])
+    const fallen = useSceneStore.getState().petalsFallen
+    if (fallen.length >= MAX_PETALS) {
+      // Every petal is down — clear the floor and start the cycle again.
+      setFallenPetals([])
+      setCaption("reset")
+    } else {
+      // Drop the next petal — a real falling-leaf animation onto the dome floor.
+      addFallenPetal(fallen.length)
+      setCaption("fall")
+    }
+    if (captionRef.current) clearTimeout(captionRef.current)
+    captionRef.current = setTimeout(() => setCaption(null), 2600)
+  }, [addFallenPetal, setFallenPetals])
 
   return (
     <>
@@ -51,29 +49,28 @@ export function MissedDayPreview() {
               background: "rgba(8, 1, 6, 0.80)",
               border: "1px solid rgba(184, 148, 74, 0.22)",
               backdropFilter: "blur(20px)",
-              cursor: busy ? "default" : "pointer",
-              opacity: busy ? 0.6 : 1,
+              cursor: "pointer",
               boxShadow: "inset 0 1px 0 rgba(255,248,240,0.06), 0 8px 24px rgba(0,0,0,0.5)",
             }}
             initial={{ opacity: 0, y: 12, filter: "blur(6px)" }}
-            animate={{ opacity: busy ? 0.6 : 1, y: 0, filter: "blur(0px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
             exit={{ opacity: 0, y: 8, filter: "blur(4px)" }}
             transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94], delay: 0.6 }}
-            whileHover={!busy ? { scale: 1.04, borderColor: "rgba(184,148,74,0.4)" } : {}}
-            whileTap={!busy ? { scale: 0.96 } : {}}
+            whileHover={{ scale: 1.04, borderColor: "rgba(184,148,74,0.4)" }}
+            whileTap={{ scale: 0.96 }}
           >
             <PetalIcon />
             <span
               className="t-label"
               style={{ fontSize: "9.5px", letterSpacing: "0.2em", color: "rgba(242,236,224,0.7)" }}
             >
-              {busy ? "A petal falls…" : "Preview a missed day"}
+              {allFallen ? "Clear the fallen petals" : "Preview a missed day"}
             </span>
           </motion.button>
         )}
       </AnimatePresence>
 
-      {/* Caption that appears while the petal drifts down */}
+      {/* Caption that appears as a petal drifts down (or the floor is cleared) */}
       <AnimatePresence>
         {caption && (
           <motion.div
@@ -88,7 +85,9 @@ export function MissedDayPreview() {
               className="t-display"
               style={{ fontSize: "clamp(18px, 3.5vw, 26px)", fontStyle: "italic", color: "rgba(242,236,224,0.82)" }}
             >
-              A day without you, and a petal falls.
+              {caption === "reset"
+                ? "A new beginning — the petals return."
+                : "An hour without you, and a petal falls."}
             </p>
           </motion.div>
         )}
