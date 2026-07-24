@@ -21,7 +21,6 @@ export function RoseReveal() {
   const phase               = useSceneStore((s) => s.phase)
   const setPhase            = useSceneStore((s) => s.setPhase)
   const setSimulationPetals = useSceneStore((s) => s.setSimulationPetals)
-  const setIsEmergence      = useSceneStore((s) => s.setIsEmergence)
 
   const [line, setLine]         = useState<string | null>(null)
   const [exiting, setExiting]   = useState(false)
@@ -62,10 +61,15 @@ export function RoseReveal() {
         setExiting(false)
         setLine(null)
         // Show the intro only the first time on this device. After that, skip
-        // straight to the rose (with the same emergence reveal).
+        // straight to the rose.
         const seen = typeof window !== "undefined" && localStorage.getItem(INSTRUCTIONS_SEEN_KEY) === "1"
         if (seen) {
-          setIsEmergence(true)
+          // Returning visitor: hand straight to the framed idle view. We do NOT
+          // fire the emergence sweep here — starting it during this reveal→idle
+          // transition (while the R3F scene is still settling) left its hand-off
+          // stuck, so the camera never pulled back and the rose never appeared
+          // (black screen). The grand emergence still plays on the first-ever
+          // "Begin the magic", which is triggered from an already-stable scene.
           setPhase("IDLE")
         } else {
           setPhase("INSTRUCTIONS")

@@ -16,6 +16,11 @@ export function CameraRig() {
   // Where to look during scripted phases — trained on the bloom (top of rose)
   const lookTarget = useRef(new THREE.Vector3(0, 1.1, 0))
 
+  // Keep a stable handle to the camera so the emergence effect can read it
+  // without listing `camera` as a dependency (see below).
+  const cameraRef = useRef(camera)
+  cameraRef.current = camera
+
   // ── Normal phase transitions ─────────────────────────────────────
   useEffect(() => {
     if (isEmergence) return   // emergence owns the camera while active
@@ -46,6 +51,7 @@ export function CameraRig() {
   // to the fixed close resting vantage. The rose itself keeps spinning slowly.
   useEffect(() => {
     if (!isEmergence) return
+    const camera = cameraRef.current
 
     gsap.killTweensOf(camera.position)
     gsap.killTweensOf(lookTarget.current)
@@ -61,13 +67,19 @@ export function CameraRig() {
     apply()
 
     const REST = CAMERA_POSITIONS.idle
-    const tl = gsap.timeline({
-      onComplete: () => {
-        lookTarget.current.set(0, 1.1, 0)
-        setIsEmergence(false)
-        setMagicActive(false)
-      },
-    })
+
+    // End the sweep exactly once: hand the camera back to OrbitControls (idle).
+    // Guarded so neither a double-invoke nor the failsafe can run it twice.
+    let ended = false
+    const finish = () => {
+      if (ended) return
+      ended = true
+      lookTarget.current.set(0, 1.1, 0)
+      setIsEmergence(false)
+      setMagicActive(false)
+    }
+
+    const tl = gsap.timeline({ onComplete: finish })
 
     // Close inside-the-dome spiral: ~340° around the rose, rising base → bloom
     tl.to(orbit, {
@@ -81,8 +93,23 @@ export function CameraRig() {
       duration: 2.0, ease: "power2.inOut", onUpdate: apply,
     })
 
-    return () => { tl.kill() }
-  }, [isEmergence, camera, setIsEmergence, setMagicActive])
+    // Failsafe: if the GSAP timeline is ever interrupted (StrictMode remount,
+    // tab throttling, a killed tween) and its onComplete never fires, the
+    // emergence flag would stay true forever — OrbitControls would never take
+    // over and the rose would never be framed (black screen / stuck close on the
+    // stem). Force the hand-off shortly after the sweep's own duration.
+    const failsafe = window.setTimeout(finish, 10_500)
+
+    return () => {
+      window.clearTimeout(failsafe)
+      tl.kill()
+    }
+    // Depend ONLY on isEmergence: the sweep must run start-to-finish uninterrupted.
+    // Including `camera` (or the zustand setters) made this effect re-run mid-sweep
+    // during the reveal→idle transition, killing and restarting the timeline so it
+    // never progressed past its dark starting frame (rose never appeared).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEmergence])
 
   // ── Per-frame look-at ───────────────────────────────────────────
   useFrame(() => {

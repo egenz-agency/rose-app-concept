@@ -121,6 +121,11 @@ export const useSceneStore = create<SceneStore>()(
   }))
 )
 
+if (typeof window !== "undefined") {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(window as any).__store = useSceneStore
+}
+
 // Selectors (avoid re-render on unrelated state)
 export const selectPhase = (s: SceneStore) => s.phase
 export const selectRose = (s: SceneStore) => s.rose

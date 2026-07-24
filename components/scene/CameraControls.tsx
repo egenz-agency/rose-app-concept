@@ -17,13 +17,22 @@ const VIEW_PRESETS = {
 
 /**
  * Blender-style free look for the rose.
- * Active only in IDLE / INSTRUCTIONS so the cinematic phases keep their
- * scripted CameraRig moves. While mounted it owns the camera; on unmount
- * CameraRig resumes control.
+ *
+ * OrbitControls stays MOUNTED for the whole scene lifetime and is toggled via
+ * `enabled` (plus autoRotate/damping). It used to unmount during scripted phases,
+ * but re-mounting it on the transition into IDLE proved unreliable when the R3F
+ * scene mounted late (after the phase was already IDLE): the controls never came
+ * back, the camera was never framed, and the rose stayed off-screen (the reported
+ * "rose not showing" black screen). Keeping it mounted removes that timing race —
+ * we just re-frame via an effect whenever idle interaction (re)starts.
  *
  * - Left-drag  → 360° orbit around the rose
  * - Scroll     → zoom in / out (dolly)
  * - View buttons → glide to a saved vantage (close / wide / default)
+ *
+ * While NOT interactive (VIDEO, INTRO, REVEAL, CARING, the emergence sweep, …)
+ * the controls are disabled with autoRotate/damping off, so CameraRig's GSAP
+ * moves own the camera without OrbitControls fighting them.
  */
 export function CameraControls() {
   const phase       = useSceneStore((s) => s.phase)
@@ -32,6 +41,36 @@ export function CameraControls() {
   const isEmergence = useSceneStore((s) => s.isEmergence)
   const { camera }  = useThree()
   const controlsRef = useRef<OrbitControlsImpl>(null)
+  const didFrameRef = useRef(false)
+  const wasInteractive = useRef(false)
+
+  const interactive = (phase === "IDLE" || phase === "INSTRUCTIONS") && !isEmergence
+
+  // Re-arm the framing snap whenever an emergence sweep starts, so the camera is
+  // re-framed once when idle interaction resumes at the end of the sweep.
+  useEffect(() => {
+    if (isEmergence) didFrameRef.current = false
+  }, [isEmergence])
+
+  // Frame the WHOLE rose (bloom included) the first time idle interaction starts,
+  // and again after an emergence sweep. OrbitControls does not clamp its initial
+  // distance and the emergence orbit can leave the camera stuck close inside the
+  // dome, so we set a known-good vantage explicitly. Runs off the `interactive`
+  // transition — controlsRef is always populated because the control never
+  // unmounts — so it can't be missed by a late scene mount.
+  useEffect(() => {
+    const controls = controlsRef.current
+    const entering = interactive && !wasInteractive.current
+    wasInteractive.current = interactive
+    if (!entering || !controls || didFrameRef.current) return
+    didFrameRef.current = true
+    const { default: rest } = VIEW_PRESETS
+    controls.target.set(0, 1.2, 0)
+    const sph = new THREE.Spherical(rest.radius, rest.polar, controls.getAzimuthalAngle())
+    camera.position.setFromSpherical(sph).add(controls.target)
+    camera.lookAt(controls.target)
+    controls.update()
+  }, [interactive, camera])
 
   // Glide to a saved vantage whenever a view button (or the magic sequence) fires.
   useEffect(() => {
@@ -68,29 +107,24 @@ export function CameraControls() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewTick])
 
-  // Suspend OrbitControls during emergence so GSAP can sweep the camera freely
-  // without damping / autoRotate fighting the animation. OrbitControls remounts
-  // when emergence ends and picks up from the GSAP final position.
-  const interactive = (phase === "IDLE" || phase === "INSTRUCTIONS") && !isEmergence
-  if (!interactive) return null
-
   return (
     <OrbitControls
       ref={controlsRef}
       makeDefault
       target={[0, 1.2, 0]}
+      enabled={interactive}
       enablePan={false}
-      enableZoom
-      enableRotate
+      enableZoom={interactive}
+      enableRotate={interactive}
       minDistance={2.2}
       maxDistance={5.0}
       zoomSpeed={0.7}
       rotateSpeed={0.55}
       minPolarAngle={0.25}
       maxPolarAngle={Math.PI / 2 + 0.15}
-      autoRotate
+      autoRotate={interactive}
       autoRotateSpeed={0.3}
-      enableDamping
+      enableDamping={interactive}
       dampingFactor={0.08}
     />
   )

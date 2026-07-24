@@ -49,6 +49,8 @@ function ExperienceInner() {
   const setDailyMessage = useSceneStore((s) => s.setDailyMessage)
   const setActiveMoment = useSceneStore((s) => s.setActiveMoment)
   const setActiveInvitation = useSceneStore((s) => s.setActiveInvitation)
+  const isEmergence     = useSceneStore((s) => s.isEmergence)
+  const setIsEmergence  = useSceneStore((s) => s.setIsEmergence)
 
   const queryClient     = useQueryClient()
 
@@ -73,6 +75,19 @@ function ExperienceInner() {
     const t = setTimeout(() => setPhase("ROSE_REVEAL"), 2800)
     return () => clearTimeout(t)
   }, [phase, setPhase])
+
+  // Emergence safety net (DOM-level, outside the R3F <Canvas>).
+  // The emergence reveal's completion hand-off lives inside the Canvas, where a
+  // Suspense re-mount during the reveal→idle transition can tear it down and
+  // leave isEmergence stuck true — so OrbitControls never takes over and the rose
+  // is never framed (a black screen, the reported bug). This timer can't be
+  // unmounted by the scene; it always ends the sweep so the rose appears. The
+  // in-scene cinematic normally clears isEmergence first (≈9.2s), clearing this.
+  useEffect(() => {
+    if (!isEmergence) return
+    const t = window.setTimeout(() => setIsEmergence(false), 9800)
+    return () => window.clearTimeout(t)
+  }, [isEmergence, setIsEmergence])
 
   // Lower dome on all non-idle/caring phases
   useEffect(() => {

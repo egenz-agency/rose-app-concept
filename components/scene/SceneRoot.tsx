@@ -30,29 +30,37 @@ export function SceneRoot({ onDomePointerDown, onDomePointerUp }: SceneRootProps
       dpr={[1, 1.75]}
       style={{ position: "absolute", inset: 0 }}
     >
+      {/* Lighting + camera must NEVER live behind a loader boundary. Keeping them
+          as direct children of the Canvas means CameraRig stays mounted even while
+          the GLB, fonts, HDR, or rapier's WASM are still resolving. Previously they
+          sat inside the Physics <Suspense>; a mid-transition suspend would unmount
+          CameraRig and strip the emergence sweep's completion hand-off, leaving the
+          reveal stuck (rose never framed / black screen). */}
+      <SceneLighting />
+      <CameraRig />
+      <CameraControls />
+
+      {/* Physics only wraps the bodies that need it (the rose + falling petals),
+          inside its own Suspense so rapier's async init can't blank the scene. */}
       <Suspense fallback={null}>
         <Physics gravity={[0, -1.2, 0]} paused={false}>
-          {/* Lighting + camera never suspend — keep them outside any loader boundary */}
-          <SceneLighting />
-          <CameraRig />
-          <CameraControls />
-
-          {/* Each asset loader gets its OWN Suspense boundary so a slow or broken
-              load (GLB, troika font, HDR) can never blank the whole scene. */}
           <Suspense fallback={null}>
             <RoseDome
               onDomePointerDown={onDomePointerDown}
               onDomePointerUp={onDomePointerUp}
             />
           </Suspense>
-
-          <Suspense fallback={null}>
-            <MemoryStarField />
-          </Suspense>
-
-          <DustParticles />
-          <MagicSparkles />
         </Physics>
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <MemoryStarField />
+      </Suspense>
+
+      <DustParticles />
+      <MagicSparkles />
+
+      <Suspense fallback={null}>
         <PostProcessing />
       </Suspense>
     </Canvas>
