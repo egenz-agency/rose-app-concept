@@ -14,6 +14,7 @@ import { MemoryStarPanel } from "@/components/ui/MemoryStarPanel"
 import { NavigationHUD } from "@/components/ui/NavigationHUD"
 import { GrowthSimulator } from "@/components/ui/GrowthSimulator"
 import { MissedDayPreview } from "@/components/ui/MissedDayPreview"
+import { MissYouButton } from "@/components/ui/MissYouButton"
 import { MomentPanel } from "@/components/ui/MomentPanel"
 import { InvitationPanel } from "@/components/ui/InvitationPanel"
 import { StreakBadge } from "@/components/ui/StreakBadge"
@@ -244,6 +245,7 @@ function ExperienceInner() {
       <ViewControls />
 
       <StreakBadge />
+      <MissYouButton />
       {phase === "IDLE" && <IdleHint />}
     </div>
   )

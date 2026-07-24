@@ -18,6 +18,40 @@ self.addEventListener("activate", (event) => {
   )
 })
 
+// ── Web Push: "I miss you" pings ────────────────────────────────────────────
+self.addEventListener("push", (event) => {
+  let data = {}
+  try { data = event.data ? event.data.json() : {} } catch { data = {} }
+  const title = data.title || "Someone misses you 💗"
+  const body = data.body || "Tap to reach back."
+  const url = data.url || "/"
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      // Group repeated pings so they collapse into the latest instead of stacking.
+      tag: "miss-you",
+      renotify: true,
+      vibrate: [80, 40, 80],
+      data: { url },
+    })
+  )
+})
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close()
+  const target = (event.notification.data && event.notification.data.url) || "/"
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if ("focus" in client) return client.focus()
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(target)
+    })
+  )
+})
+
 self.addEventListener("fetch", (event) => {
   const req = event.request
   if (req.method !== "GET") return
