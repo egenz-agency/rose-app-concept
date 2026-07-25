@@ -70,9 +70,17 @@ export function RoseDome({ onDomePointerDown, onDomePointerUp }: RoseDomeProps) 
 
       if (name.includes("table")) {
         // The GLB "table" is the glass-dome floor — keep it visible so fallen
-        // petals have a real surface to land on and rest against.
+        // petals have a real surface to land on and rest against. The raw table
+        // is ~1.8× wider than the dome, so shrink its footprint (X/Z only) to
+        // match the glass base (~0.75 vs 1.36 world radius). Guarded so React's
+        // dev double-invoke can't apply the shrink twice.
         child.visible = true
         child.receiveShadow = true
+        if (!child.userData._floorScaled) {
+          child.scale.x *= 0.56
+          child.scale.z *= 0.56
+          child.userData._floorScaled = true
+        }
 
       } else if (name.includes("rose") && !name.includes("glass")) {
         const mat = (rawMat as THREE.MeshStandardMaterial).clone()
