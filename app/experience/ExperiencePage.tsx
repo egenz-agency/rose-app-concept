@@ -14,6 +14,7 @@ import { MemoryStarPanel } from "@/components/ui/MemoryStarPanel"
 import { NavigationHUD } from "@/components/ui/NavigationHUD"
 import { GrowthSimulator } from "@/components/ui/GrowthSimulator"
 import { MissedDayPreview } from "@/components/ui/MissedDayPreview"
+import { MissYouButton } from "@/components/ui/MissYouButton"
 import { MomentPanel } from "@/components/ui/MomentPanel"
 import { HoldRing } from "@/components/ui/HoldRing"
 import { ViewControls } from "@/components/ui/ViewControls"
@@ -228,6 +229,7 @@ function ExperienceInner({ slug, config }: { slug?: string; config?: TenantConfi
       <MemoryStarPanel />
       <GrowthSimulator />
       <MissedDayPreview />
+      <MissYouButton />
       <ViewControls />
 
       {phase === "IDLE" && <IdleHint />}

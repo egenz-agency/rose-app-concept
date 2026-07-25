@@ -9,8 +9,16 @@ import {
   fetchLetters as srvFetchLetters,
   fetchGalleryPhotos as srvFetchGalleryPhotos,
 } from "@/lib/server/tenantQueries"
+import {
+  getVapidPublicKey,
+  registerPushSubscription,
+  countPartnerDevices,
+  sendMissYou as srvSendMissYou,
+  isGiftRole,
+  type GiftRole,
+} from "@/lib/server/pushQueries"
 import { getAccessibleTenant } from "@/lib/security/giftAccess"
-import { cleanText, cleanDate, cleanHttpUrl, LIMITS } from "@/lib/security/validate"
+import { cleanText, cleanDate, cleanHttpUrl, cleanInt, LIMITS } from "@/lib/security/validate"
 import { enforceRateLimit, clientIp } from "@/lib/security/ratelimit"
 
 // Resolve a gift slug → tenant_id on the server. This is the ONLY place the slug
@@ -78,4 +86,64 @@ export async function fetchLettersAction(slug: string) {
 
 export async function fetchGalleryPhotosAction(slug: string) {
   return srvFetchGalleryPhotos(await tenantIdFor(slug))
+}
+
+// ── "I miss you" ─────────────────────────────────────────────────────────────
+// All three actions resolve the slug through getAccessibleTenant (secret
+// access-token cookie required), so only someone who legitimately has this gift
+// can register a device or send a ping — and a ping can only ever reach the
+// OTHER role inside THIS gift.
+
+// What the client needs to offer the feature: the VAPID public key, both names
+// (so the enable step can ask "which of you is this?"), and whether the other
+// side has a device registered yet.
+export async function getMissYouConfigAction(slug: string) {
+  const tenant = await getAccessibleTenant(slug)
+  if (!tenant) throw new Error("This gift does not exist")
+  const publicKey = await getVapidPublicKey()
+  return {
+    publicKey,
+    giverName: tenant.giver_name ?? "Your love",
+    recipientName: tenant.recipient_name ?? "Your love",
+  }
+}
+
+export async function registerMissYouDeviceAction(
+  slug: string,
+  role: string,
+  subscription: { endpoint?: unknown; p256dh?: unknown; auth?: unknown }
+) {
+  const tenant = await getAccessibleTenant(slug)
+  if (!tenant) throw new Error("This gift does not exist")
+  if (!isGiftRole(role)) throw new Error("Unknown role")
+  await enforceRateLimit(`push-reg:${tenant.id}:${await clientIp()}`, 20, 3600) // 20/hour per IP
+
+  const endpoint = cleanHttpUrl(subscription?.endpoint)
+  const p256dh = cleanText(subscription?.p256dh, 255)
+  const auth = cleanText(subscription?.auth, 255)
+  if (!endpoint || !p256dh || !auth) throw new Error("Invalid push subscription")
+
+  await registerPushSubscription(tenant.id, role as GiftRole, { endpoint, p256dh, auth }, null)
+  return { ok: true }
+}
+
+export async function sendMissYouAction(slug: string, role: string, count: unknown) {
+  const tenant = await getAccessibleTenant(slug)
+  if (!tenant) throw new Error("This gift does not exist")
+  if (!isGiftRole(role)) throw new Error("Unknown role")
+  // Taps are batched client-side; this still caps how often a gift can ping.
+  await enforceRateLimit(`miss-you:${tenant.id}:${await clientIp()}`, 30, 3600) // 30/hour per IP
+
+  const n = cleanInt(count, 1, 99) ?? 1
+  const fromName =
+    (role === "giver" ? tenant.giver_name : tenant.recipient_name) ?? "Your love"
+
+  const partnerDevices = await countPartnerDevices(tenant.id, role as GiftRole)
+  if (partnerDevices === 0) {
+    // Nothing to send to yet — tell the sender instead of silently succeeding.
+    return { ok: false, reason: "no-partner-device" as const, sent: 0 }
+  }
+
+  const result = await srvSendMissYou(tenant.id, role as GiftRole, fromName, n)
+  return { ok: result.sent > 0, reason: null, ...result }
 }

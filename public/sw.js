@@ -18,6 +18,46 @@ self.addEventListener("activate", (event) => {
   )
 })
 
+// ── Web Push: "I miss you" pings ────────────────────────────────────────────
+self.addEventListener("push", (event) => {
+  let data = {}
+  try { data = event.data ? event.data.json() : {} } catch { data = {} }
+  const title = data.title || "Someone misses you 💗"
+  const body = data.body || "Tap to reach back."
+  const url = data.url || "/"
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      // Group repeated pings so they collapse into the latest instead of stacking.
+      tag: "miss-you",
+      // …but still re-alert (buzz again) when a new ping replaces the old one.
+      renotify: true,
+      // A heartbeat: two quick beats, a pause, two more. Android honours this.
+      // NOTE: iOS ignores `vibrate` — there the phone buzzes according to the
+      // system notification settings for the installed PWA, which we can't force.
+      vibrate: [100, 50, 100, 250, 100, 50, 100],
+      // Never post silently — a silent notification suppresses vibration.
+      silent: false,
+      data: { url },
+    })
+  )
+})
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close()
+  const target = (event.notification.data && event.notification.data.url) || "/"
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if ("focus" in client) return client.focus()
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(target)
+    })
+  )
+})
+
 self.addEventListener("fetch", (event) => {
   const req = event.request
   if (req.method !== "GET") return
