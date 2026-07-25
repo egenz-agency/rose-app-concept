@@ -32,8 +32,14 @@ self.addEventListener("push", (event) => {
       badge: "/icon-192.png",
       // Group repeated pings so they collapse into the latest instead of stacking.
       tag: "miss-you",
+      // …but still re-alert (buzz again) when a new ping replaces the old one.
       renotify: true,
-      vibrate: [80, 40, 80],
+      // A heartbeat: two quick beats, a pause, two more. Android honours this.
+      // NOTE: iOS ignores `vibrate` — there the phone buzzes according to the
+      // system notification settings for the installed PWA, which we can't force.
+      vibrate: [100, 50, 100, 250, 100, 50, 100],
+      // Never post silently — a silent notification suppresses vibration.
+      silent: false,
       data: { url },
     })
   )

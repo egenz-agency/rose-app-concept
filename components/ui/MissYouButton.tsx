@@ -52,7 +52,8 @@ export function MissYouButton({ variant = "floating" }: { variant?: "floating" |
 
   const tap = useCallback(() => {
     setHearts((h) => [...h, Date.now() + Math.random()])
-    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(28)
+    // A soft double-tick on your own phone — the same heartbeat they'll feel.
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([20, 45, 20])
     pendingRef.current += 1
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(flushSend, BATCH_MS)
