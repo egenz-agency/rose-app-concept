@@ -7,15 +7,15 @@ import {
   isEnabled,
   enableMissYou,
   sendMissYou,
-  fetchNames,
-  getMyRole,
-  type GiftRole,
+  fetchPartnerName,
 } from "@/lib/push/missYou"
 
 // Rapid taps are batched into a single "×N" ping so the other person's lock
 // screen gets one warm buzz, not forty. This is how long we wait for more taps.
 const BATCH_MS = 3500
 
+// Her side of "I miss you", on the gift page. One tap to turn on, then every tap
+// reaches him. (He sends from his own dashboard, so there's no role to pick.)
 export function MissYouButton() {
   const phase = useSceneStore((s) => s.phase)
   const slug = useSceneStore((s) => s.tenantSlug)
@@ -25,8 +25,7 @@ export function MissYouButton() {
   const [enabled, setEnabled] = useState(false)
 
   const [showEnable, setShowEnable] = useState(false)
-  const [names, setNames] = useState<{ giverName: string; recipientName: string } | null>(null)
-  const [picked, setPicked] = useState<GiftRole | null>(null)
+  const [partnerName, setPartnerName] = useState("your love")
   const [enabling, setEnabling] = useState(false)
   const [enableError, setEnableError] = useState<string | null>(null)
 
@@ -64,11 +63,9 @@ export function MissYouButton() {
     if (!slug) return
     setShowEnable(true)
     setEnableError(null)
-    const n = await fetchNames(slug)
-    setNames({ giverName: n.giverName, recipientName: n.recipientName })
-    if (!n.configured) {
-      setEnableError("Push isn't configured for this deployment yet.")
-    }
+    const n = await fetchPartnerName(slug)
+    setPartnerName(n.partnerName)
+    if (!n.configured) setEnableError("Push isn't configured for this deployment yet.")
   }, [slug])
 
   const onButton = () => {
@@ -80,10 +77,10 @@ export function MissYouButton() {
   }
 
   const doEnable = async () => {
-    if (!slug || !picked) return
+    if (!slug) return
     setEnabling(true)
     setEnableError(null)
-    const res = await enableMissYou(slug, picked)
+    const res = await enableMissYou(slug)
     setEnabling(false)
     if (res === "granted") {
       setEnabled(true)
@@ -101,14 +98,6 @@ export function MissYouButton() {
 
   // Only on a real gift page (needs a slug), while idle, and where push can work.
   if (!mounted || !supported || !slug || phase !== "IDLE") return null
-
-  const myRole = getMyRole(slug)
-  const partnerName =
-    names && myRole
-      ? myRole === "giver"
-        ? names.recipientName
-        : names.giverName
-      : "them"
 
   return (
     <>
@@ -187,7 +176,7 @@ export function MissYouButton() {
               style={{ fontSize: "13px", fontStyle: "italic", color: "rgba(242,236,224,0.75)" }}
             >
               {status === "reaching" && "Reaching across the distance…"}
-              {status === "sent" && "They'll feel it 💗"}
+              {status === "sent" && "He'll feel it 💗"}
               {status === "waiting" && `${partnerName} hasn't turned this on yet — they'll feel it once they do.`}
               {status === "failed" && "Couldn't send — try again"}
             </span>
@@ -195,7 +184,7 @@ export function MissYouButton() {
         )}
       </AnimatePresence>
 
-      {/* First-run: pick which side of the gift this device is, then enable */}
+      {/* First run: just turn it on */}
       <AnimatePresence>
         {showEnable && (
           <motion.div
@@ -227,52 +216,14 @@ export function MissYouButton() {
                   className="t-display"
                   style={{ fontSize: "23px", fontStyle: "italic", color: "rgba(242,236,224,0.94)" }}
                 >
-                  Let them feel it when you miss them
+                  Let {partnerName} feel it when you miss them
                 </h2>
                 <p
                   className="t-serif"
                   style={{ fontSize: "13.5px", color: "rgba(242,236,224,0.6)", lineHeight: 1.6, marginTop: 4 }}
                 >
-                  Tap “I miss you” and a gentle notification reaches their phone. Turn it on so you get theirs too.
+                  Tap the heart and a gentle notification reaches their phone. Turn it on so you feel theirs too.
                 </p>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label
-                  className="t-label"
-                  style={{ fontSize: "8.5px", letterSpacing: "0.24em", color: "rgba(184,148,74,0.7)" }}
-                >
-                  Which of you is this?
-                </label>
-                <div className="flex flex-col gap-2">
-                  {(
-                    [
-                      ["recipient", names?.recipientName ?? "Me"],
-                      ["giver", names?.giverName ?? "My love"],
-                    ] as const
-                  ).map(([role, label]) => (
-                    <button
-                      key={role}
-                      onClick={() => setPicked(role)}
-                      className="rounded-xl px-4 py-3 t-serif text-left"
-                      style={{
-                        background: picked === role ? "rgba(138,21,40,0.35)" : "rgba(255,255,255,0.04)",
-                        border:
-                          picked === role
-                            ? "1px solid rgba(184,148,74,0.55)"
-                            : "1px solid rgba(255,255,255,0.1)",
-                        color: "rgba(242,236,224,0.92)",
-                        fontSize: "15px",
-                        cursor: "pointer",
-                      }}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                <span style={{ fontSize: "11px", color: "rgba(242,236,224,0.4)", lineHeight: 1.5 }}>
-                  This phone will receive the other person’s hearts.
-                </span>
               </div>
 
               {enableError && (
@@ -297,18 +248,16 @@ export function MissYouButton() {
                 </button>
                 <button
                   onClick={doEnable}
-                  disabled={enabling || !picked}
+                  disabled={enabling}
                   className="flex-1 rounded-full t-label"
                   style={{
                     fontSize: "10px",
                     letterSpacing: "0.18em",
                     color: "rgba(255,248,240,0.95)",
                     padding: "13px 18px",
-                    background: picked
-                      ? "linear-gradient(90deg, rgba(138,21,40,0.95), rgba(184,80,74,0.9))"
-                      : "rgba(255,255,255,0.06)",
+                    background: "linear-gradient(90deg, rgba(138,21,40,0.95), rgba(184,80,74,0.9))",
                     border: "1px solid rgba(184,148,74,0.3)",
-                    cursor: enabling || !picked ? "default" : "pointer",
+                    cursor: enabling ? "default" : "pointer",
                     opacity: enabling ? 0.7 : 1,
                   }}
                 >

@@ -6,6 +6,7 @@ import {
   addMomentAction, deleteMomentAction, signOutAction,
   updateNamesAction, uploadMediaAction, clearMediaAction, deleteAccountAction,
 } from "./actions"
+import { MissYouOwner } from "./MissYouOwner"
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>
@@ -52,6 +53,9 @@ export function DashboardClient({
             This is a private link — only the person you send it to can open the gift. Keep it just between you two. On her phone she can add it to her home screen to install it like an app.
           </p>
         </div>
+
+        {/* "I miss you" — reach her from here, no need to open her gift link */}
+        <MissYouOwner recipientName={(tenant.recipient_name as string | null) ?? null} />
 
         {/* Customize */}
         <Section title="Customize">

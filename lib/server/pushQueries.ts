@@ -103,11 +103,20 @@ export async function sendMissYou(
   webpush.setVapidDetails(vapid.subject, vapid.publicKey, vapid.privateKey)
 
   const sb = getAdminClient()
+  const target = otherRole(fromRole)
   const { data: subs } = await sb
     .from("push_subscriptions")
     .select("endpoint,p256dh,auth")
     .eq("tenant_id", tenantId)
-    .eq("role", otherRole(fromRole))
+    .eq("role", target)
+
+  // Where tapping the notification should land — her gift, or his dashboard.
+  // ("/" would bounce her to the login page, which isn't hers to use.)
+  let url = "/dashboard"
+  if (target === "recipient") {
+    const { data: t } = await sb.from("tenants").select("slug").eq("id", tenantId).single()
+    url = t?.slug ? `/r/${t.slug}` : "/"
+  }
 
   const list = subs ?? []
   const n = Math.max(1, Math.min(99, count))
@@ -115,7 +124,7 @@ export async function sendMissYou(
   const payload = JSON.stringify({
     title,
     body: "Thinking of you right now — tap to reach back.",
-    url: "/",
+    url,
   })
 
   let sent = 0

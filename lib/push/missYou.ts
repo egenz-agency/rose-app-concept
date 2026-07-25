@@ -4,78 +4,48 @@ import {
   registerMissYouDeviceAction,
   sendMissYouAction,
 } from "@/app/r/[slug]/actions"
+import {
+  isPushSupported,
+  permissionState,
+  subscribeThisDevice,
+  type EnableResult,
+  type SendOutcome,
+} from "./pushCore"
 
-// Client half of the gift-scoped "I miss you" feature.
+// The RECIPIENT half of "I miss you" — the gift page (`/r/[slug]`).
 //
-// Everything security-relevant happens on the server: the slug is resolved to a
-// tenant through the secret access-token cookie, and a ping is only delivered to
-// the other role inside that same gift. The browser only ever holds its own
-// subscription plus which side of the gift this device belongs to.
+// A device here is always the gift's `recipient`; the giver sends from his own
+// authenticated dashboard instead. So there's nothing to choose: one tap to
+// enable, then taps send. The server resolves the slug through the secret
+// access-token cookie and only ever delivers to the giver of THAT gift.
 
-export type GiftRole = "giver" | "recipient"
+const enabledKey = (slug: string) => `missYou.enabled.${slug}`
 
-// Which side of the gift this device is, remembered per gift slug.
-const roleKey = (slug: string) => `missYou.role.${slug}`
+export { isPushSupported, permissionState }
+export type { EnableResult, SendOutcome }
 
-// Web Push needs the VAPID key as a Uint8Array, not base64url.
-function urlBase64ToUint8Array(base64: string): Uint8Array {
-  const padding = "=".repeat((4 - (base64.length % 4)) % 4)
-  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/")
-  const raw = atob(b64)
-  const out = new Uint8Array(raw.length)
-  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i)
-  return out
+function markEnabled(slug: string) {
+  if (typeof window !== "undefined") window.localStorage.setItem(enabledKey(slug), "1")
 }
 
-export function isPushSupported(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    "serviceWorker" in navigator &&
-    "PushManager" in window &&
-    "Notification" in window
-  )
-}
-
-export function getMyRole(slug: string): GiftRole | null {
-  if (typeof window === "undefined") return null
-  const v = window.localStorage.getItem(roleKey(slug))
-  return v === "giver" || v === "recipient" ? v : null
-}
-
-function setMyRole(slug: string, role: GiftRole) {
-  if (typeof window !== "undefined") window.localStorage.setItem(roleKey(slug), role)
-}
-
-export function permissionState(): NotificationPermission | "unsupported" {
-  if (!isPushSupported()) return "unsupported"
-  return Notification.permission
-}
-
-// Enabled once this device has picked a side, granted permission, and registered.
 export function isEnabled(slug: string): boolean {
-  return isPushSupported() && permissionState() === "granted" && !!getMyRole(slug)
+  if (!isPushSupported() || permissionState() !== "granted") return false
+  return typeof window !== "undefined" && window.localStorage.getItem(enabledKey(slug)) === "1"
 }
 
-// Both names, so the enable step can ask "which of you is this?".
-export async function fetchNames(
+// Who she'd be reaching (the giver), for the enable copy and status messages.
+export async function fetchPartnerName(
   slug: string
-): Promise<{ giverName: string; recipientName: string; configured: boolean }> {
+): Promise<{ partnerName: string; configured: boolean }> {
   try {
     const cfg = await getMissYouConfigAction(slug)
-    return {
-      giverName: cfg.giverName,
-      recipientName: cfg.recipientName,
-      configured: !!cfg.publicKey,
-    }
+    return { partnerName: cfg.giverName, configured: !!cfg.publicKey }
   } catch {
-    return { giverName: "Your love", recipientName: "Your love", configured: false }
+    return { partnerName: "your love", configured: false }
   }
 }
 
-export type EnableResult = "granted" | "denied" | "unsupported" | "unconfigured" | "error"
-
-// Ask permission, subscribe, and register this device against one side of the gift.
-export async function enableMissYou(slug: string, role: GiftRole): Promise<EnableResult> {
+export async function enableMissYou(slug: string): Promise<EnableResult> {
   if (!isPushSupported()) return "unsupported"
 
   let publicKey: string | null = null
@@ -86,41 +56,22 @@ export async function enableMissYou(slug: string, role: GiftRole): Promise<Enabl
   }
   if (!publicKey) return "unconfigured"
 
-  const permission = await Notification.requestPermission()
-  if (permission !== "granted") return permission === "denied" ? "denied" : "error"
+  const sub = await subscribeThisDevice(publicKey)
+  if (!sub.ok) return sub.reason
 
   try {
-    const reg = await navigator.serviceWorker.ready
-    let sub = await reg.pushManager.getSubscription()
-    if (!sub) {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
-      })
-    }
-    const json = sub.toJSON()
-    if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return "error"
-
-    await registerMissYouDeviceAction(slug, role, {
-      endpoint: json.endpoint,
-      p256dh: json.keys.p256dh,
-      auth: json.keys.auth,
-    })
-    setMyRole(slug, role)
+    await registerMissYouDeviceAction(slug, "recipient", sub.keys)
+    markEnabled(slug)
     return "granted"
   } catch {
     return "error"
   }
 }
 
-export type SendOutcome = "sent" | "no-partner-device" | "error"
-
-// Send a ping to the other person in this gift. `count` batches rapid taps.
+// Send a ping to the giver of this gift. `count` batches rapid taps.
 export async function sendMissYou(slug: string, count: number): Promise<SendOutcome> {
-  const role = getMyRole(slug)
-  if (!role) return "error"
   try {
-    const res = await sendMissYouAction(slug, role, count)
+    const res = await sendMissYouAction(slug, "recipient", count)
     if (res.ok) return "sent"
     return res.reason === "no-partner-device" ? "no-partner-device" : "error"
   } catch {

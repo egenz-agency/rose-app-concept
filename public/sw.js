@@ -50,8 +50,17 @@ self.addEventListener("notificationclick", (event) => {
   const target = (event.notification.data && event.notification.data.url) || "/"
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      // Prefer a window already on the target page (her gift / his dashboard).
       for (const client of clients) {
-        if ("focus" in client) return client.focus()
+        try {
+          if (new URL(client.url).pathname === target && "focus" in client) return client.focus()
+        } catch {}
+      }
+      // Otherwise reuse an open window but send it to the right place.
+      for (const client of clients) {
+        if ("navigate" in client && "focus" in client) {
+          return client.navigate(target).then((c) => (c || client).focus()).catch(() => client.focus())
+        }
       }
       if (self.clients.openWindow) return self.clients.openWindow(target)
     })

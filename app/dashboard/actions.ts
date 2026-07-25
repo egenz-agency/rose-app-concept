@@ -7,6 +7,12 @@ import {
   cleanSlug, cleanText, cleanDate, cleanHttpUrl, cleanInt, validateUpload, LIMITS,
 } from "@/lib/security/validate"
 import { enforceRateLimit } from "@/lib/security/ratelimit"
+import {
+  getVapidPublicKey,
+  registerPushSubscription,
+  countPartnerDevices,
+  sendMissYou as srvSendMissYou,
+} from "@/lib/server/pushQueries"
 
 // All dashboard mutations run through the buyer's OWN session, so Postgres RLS
 // guarantees they can only ever touch their own tenant's rows. We additionally
@@ -189,4 +195,57 @@ export async function deleteAccountAction() {
   const { error } = await admin.auth.admin.deleteUser(uid)
   if (error) throw new Error(error.message)
   await sb.auth.signOut()
+}
+
+// ── "I miss you" (owner side) ────────────────────────────────────────────────
+// The buyer sends from their OWN dashboard, so their identity comes from their
+// session — not from a role they pick. They are always the gift's `giver`, and a
+// ping goes only to the `recipient` devices of their own tenant, which
+// requireMyTenantId() resolved through their RLS-scoped session.
+
+// The public VAPID key + who they'd be reaching. Safe to expose to the browser.
+export async function getOwnerMissYouConfigAction() {
+  const tenantId = await requireMyTenantId()
+  const sb = await getSaasServerClient()
+  const { data } = await sb.from("tenants").select("recipient_name").eq("id", tenantId).single()
+  return {
+    publicKey: await getVapidPublicKey(),
+    recipientName: (data?.recipient_name as string | null) ?? "Your love",
+  }
+}
+
+export async function registerOwnerDeviceAction(subscription: {
+  endpoint?: unknown
+  p256dh?: unknown
+  auth?: unknown
+}) {
+  const tenantId = await requireMyTenantId()
+  await enforceRateLimit(`push-reg-owner:${tenantId}`, 20, 3600) // 20/hour per gift
+
+  const endpoint = cleanHttpUrl(subscription?.endpoint)
+  const p256dh = cleanText(subscription?.p256dh, 255)
+  const auth = cleanText(subscription?.auth, 255)
+  if (!endpoint || !p256dh || !auth) throw new Error("Invalid push subscription")
+
+  await registerPushSubscription(tenantId, "giver", { endpoint, p256dh, auth }, null)
+  return { ok: true }
+}
+
+export async function sendOwnerMissYouAction(count: unknown) {
+  const tenantId = await requireMyTenantId()
+  await enforceRateLimit(`miss-you-owner:${tenantId}`, 30, 3600) // 30/hour per gift
+
+  const sb = await getSaasServerClient()
+  const { data } = await sb.from("tenants").select("giver_name").eq("id", tenantId).single()
+  const fromName = (data?.giver_name as string | null) ?? "Your love"
+
+  const partnerDevices = await countPartnerDevices(tenantId, "giver")
+  if (partnerDevices === 0) {
+    // Nothing to send to yet — tell the sender instead of silently succeeding.
+    return { ok: false, reason: "no-partner-device" as const, sent: 0 }
+  }
+
+  const n = cleanInt(count, 1, 99) ?? 1
+  const result = await srvSendMissYou(tenantId, "giver", fromName, n)
+  return { ok: result.sent > 0, reason: null, ...result }
 }

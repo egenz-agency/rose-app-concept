@@ -589,11 +589,19 @@ This is the important part in a multi-tenant deployment.
 - `push_subscriptions` and `app_config` have **RLS on with no policy** — only the service-role admin client (server actions) can touch them, matching `rate_limits`.
 - Both register and send are **rate-limited** per gift + IP.
 
+### Two sides, two pages
+Each person uses **their own** page, so nobody has to pick a role:
+
+| Side | Where | Identity comes from |
+|---|---|---|
+| **Recipient** (her) | the gift page `/r/[slug]` | the secret access-token cookie → always `recipient` |
+| **Giver** (him) | his dashboard `/dashboard` | his logged-in session → always `giver` |
+
 ### Flow
-1. **Enable (once per device):** the first tap asks *"Which of you is this?"*, pre-filled with the gift's `giver_name` / `recipient_name`. On allow, the browser subscribes and the device is registered against that gift + role. The role is cached in `localStorage` per slug.
-2. **Send:** taps batch for 3.5s, then `sendMissYouAction(slug, role, count)`.
-3. **Route:** the server loads VAPID keys from `app_config`, finds the other role's devices in that gift, and sends via `web-push`. Dead subscriptions (404/410) are pruned.
-4. **Receive:** the service worker shows `"{name} misses you ×N 💗"` with a heartbeat vibration; tapping focuses/opens the app.
+1. **Enable (once per device):** one tap → allow notifications. The device subscribes and is registered against that gift with the role implied by the page. No role picker.
+2. **Send:** taps batch for 3.5s, then `sendMissYouAction(slug, "recipient", n)` (her) or `sendOwnerMissYouAction(n)` (him).
+3. **Route:** the server loads VAPID keys from `app_config`, finds the *other* role's devices in that gift, and sends via `web-push`. Dead subscriptions (404/410) are pruned.
+4. **Receive:** the service worker shows `"{name} misses you ×N 💗"` with a heartbeat vibration. Tapping opens **the right page for that person** — her gift (`/r/{slug}`) or his `/dashboard` — reusing an open window when there is one.
 
 If the other side hasn't enabled it yet, the sender is told so rather than the ping silently vanishing.
 
@@ -601,9 +609,12 @@ If the other side hasn't enabled it yet, the sender is told so rather than the p
 | Piece | File |
 |---|---|
 | Server: keys, register, route, send | `lib/server/pushQueries.ts` (`server-only`) |
-| Server actions (access-checked, rate-limited) | `app/r/[slug]/actions.ts` |
-| Client: support/permission/subscribe/send | `lib/push/missYou.ts` |
-| Button + role picker + tap batching | `components/ui/MissYouButton.tsx` |
+| Server actions — her side (cookie-checked) | `app/r/[slug]/actions.ts` |
+| Server actions — his side (session-checked) | `app/dashboard/actions.ts` |
+| Shared browser plumbing | `lib/push/pushCore.ts` |
+| Client — her side / his side | `lib/push/missYou.ts` / `lib/push/missYouOwner.ts` |
+| Her button (gift page) | `components/ui/MissYouButton.tsx` |
+| His card (dashboard) | `app/dashboard/MissYouOwner.tsx` |
 | Service worker push + notificationclick | `public/sw.js` |
 | Tables | `push_subscriptions`, `app_config` (rose-saas) |
 
@@ -612,8 +623,9 @@ The **public** VAPID key is served to the browser on demand; the **private** key
 
 ### Requirements / gotchas
 - **iOS:** Web Push only works for a PWA **installed to the home screen** on **iOS 16.4+** — not in a Safari tab. iOS also ignores the `vibrate` pattern (the system decides).
-- Each phone must pick a **different side** of the gift (one `giver`, one `recipient`).
-- Re-enabling on the same device updates in place (keyed on endpoint); switching role moves it rather than duplicating.
+- Each side enables on **their own page** (she on the gift link, he on the dashboard) — that is what assigns the role.
+- Re-enabling on the same device updates in place (keyed on endpoint), so a device can move sides without duplicating.
+- If the other side hasn't enabled yet, the sender is told rather than the ping silently vanishing.
 
 ---
 
