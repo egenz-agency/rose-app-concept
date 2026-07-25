@@ -11,6 +11,10 @@ interface SceneStore {
   dailyMessage: string | null
   isFirstVisitToday: boolean
   petalsFallen: number[]
+  // The petal index that just fell *now* (via addFallenPetal), or null when the
+  // set was synced in bulk (setFallenPetals). Only this one animates its fall —
+  // petals that already fell while she was away appear resting on the floor.
+  lastAddedPetal: number | null
   isAudioEnabled: boolean
   activePanelId: string | null
   isLoading: boolean
@@ -69,6 +73,7 @@ export const useSceneStore = create<SceneStore>()(
     dailyMessage: null,
     isFirstVisitToday: false,
     petalsFallen: [],
+    lastAddedPetal: null,
     isAudioEnabled: false,
     activePanelId: null,
     isLoading: true,
@@ -94,10 +99,13 @@ export const useSceneStore = create<SceneStore>()(
 
     setFirstVisitToday: (v) => set({ isFirstVisitToday: v }),
 
+    // A petal falling right now → it animates its drift down to the floor.
     addFallenPetal: (idx) =>
-      set((s) => ({ petalsFallen: [...new Set([...s.petalsFallen, idx])] })),
+      set((s) => ({ petalsFallen: [...new Set([...s.petalsFallen, idx])], lastAddedPetal: idx })),
 
-    setFallenPetals: (indices) => set({ petalsFallen: indices }),
+    // A bulk sync (petals that fell while away, or a reset) → no fall animation;
+    // they simply appear already resting on the dome floor.
+    setFallenPetals: (indices) => set({ petalsFallen: indices, lastAddedPetal: null }),
 
     toggleAudio: () => set((s) => ({ isAudioEnabled: !s.isAudioEnabled })),
 

@@ -30,12 +30,15 @@ const HOLD_DURATION_MS = 1500
 const CLICK_THRESHOLD_MS = 200 // pointer released before this → treat as click (dome lift)
 const MAX_PETALS = 40
 
+// One petal falls for every HOURS_PER_PETAL hours the rose goes untended.
+const HOURS_PER_PETAL = 3
+
 // How many petals should be lying on the dome floor given how long the rose has
-// gone untended: one per whole hour since the last visit, capped at MAX_PETALS.
+// gone untended: one per 3 whole hours since the last visit, capped at MAX_PETALS.
 function fallenFromElapsed(lastVisited: string | null): number {
   if (!lastVisited) return 0
   const hours = differenceInHours(new Date(), parseISO(lastVisited))
-  return Math.max(0, Math.min(MAX_PETALS, hours))
+  return Math.max(0, Math.min(MAX_PETALS, Math.floor(hours / HOURS_PER_PETAL)))
 }
 
 const SceneRoot = dynamic(
@@ -83,9 +86,9 @@ function ExperienceInner() {
       .catch(() => {})
   }, [setRose, setFallenPetals])
 
-  // While the experience is open, drop one more petal each hour the rose stays
-  // untended, until the floor is full. Runs off real elapsed time so it stays
-  // correct across reloads and matches what the Preview button demonstrates.
+  // While the experience is open, drop one more petal every 3 hours the rose
+  // stays untended, until the floor is full. Runs off real elapsed time so it
+  // stays correct across reloads and matches what the Preview button shows.
   useEffect(() => {
     const tick = () => {
       const { rose, petalsFallen, addFallenPetal } = useSceneStore.getState()

@@ -564,6 +564,19 @@ Letters are seeded in `supabase/migrations/002_seed.sql`. He can add more direct
 
 ---
 
+## Falling Petals
+
+Petals fall onto the **glass-dome floor** as the rose goes untended, and stay there until it's cared for.
+
+- **Rate:** one petal every **3 hours** since `last_visited` (`HOURS_PER_PETAL` in `ExperiencePage.tsx`), capped at 40. Derived from real elapsed time, so it's correct across reloads.
+- **On open:** the floor is seeded with however many petals are already due — they appear **already resting** on the floor, with **no falling animation** (they fell while she was away).
+- **Only a petal falling *now* animates.** The store distinguishes intent: `addFallenPetal()` sets `lastAddedPetal` (that one petal drifts down), while `setFallenPetals()` clears it (bulk sync / reset → silent placement). `PetalParticles` animates only `i === lastAddedPetal`.
+- **Cleared by:** tending (`CarePanel`) and the press-and-hold bloom (`runMagic`) — both call `setFallenPetals([])`.
+- **Motion:** driven by **GSAP tweens, not physics** — each petal drifts from the bloom to a fixed slot on the floor (golden-angle scatter) and rests there. Rapier bodies were used originally but desynced inside the rotating rose group and never settled.
+- **Preview:** "Preview a missed day" drops one more petal per press so you can watch them accumulate; once all 40 are down, the next press clears the floor.
+
+---
+
 ## Streak
 
 The streak is a **running count of days cared for**, stored in `rose_state.streak_days`. The database is the single source of truth.

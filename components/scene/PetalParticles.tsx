@@ -21,19 +21,19 @@ function rand(i: number, salt: number): number {
   return x - Math.floor(x)
 }
 
-// Petals that have fallen onto the glass-dome floor. One petal falls per hour the
-// rose goes untended (Beauty-&-the-Beast style); tending or blooming clears them.
+// Petals that have fallen onto the glass-dome floor. One petal falls every 3 hours
+// the rose goes untended (Beauty-&-the-Beast style); tending or blooming clears them.
 // Each newly-fallen petal drifts down from the bloom and SETTLES on the floor,
 // where it stays and accumulates until the rose is cared for. Driven by GSAP
 // tweens (not physics) so landing is deterministic and reliable.
 export function PetalParticles() {
   const petalsFallen = useSceneStore((s) => s.petalsFallen)
+  const lastAddedPetal = useSceneStore((s) => s.lastAddedPetal)
   const groupRefs = useRef<(THREE.Group | null)[]>([])
   // "hidden" (parked out of sight) → "falling" (mid-drift) → "resting" (on floor)
   const petalState = useRef<("hidden" | "falling" | "resting")[]>(
     Array(MAX_PETALS).fill("hidden")
   )
-  const inited = useRef(false)
 
   const { scene } = useGLTF("/models/rose-petals.glb")
 
@@ -83,14 +83,11 @@ export function PetalParticles() {
     const fallenSet = new Set(petalsFallen)
     const newly = petalsFallen.filter((i) => petalState.current[i] === "hidden")
 
-    if (newly.length > 0) {
-      // Only a single petal added AFTER the initial sync gets the falling
-      // animation (the Preview button / one missed hour). The first sync and any
-      // bulk change settle silently — those petals fell while she was away.
-      const animate = inited.current && newly.length === 1
-      inited.current = true
-
-      newly.forEach((i) => {
+    newly.forEach((i) => {
+        // ONLY the petal that just fell (addFallenPetal) animates its drift down.
+        // Everything else — petals that fell while she was away, any bulk sync —
+        // appears already resting on the dome floor, no falling animation.
+        const animate = i === lastAddedPetal
         const g = groupRefs.current[i]
         if (!g) return
         const slot = slots[i]
@@ -119,10 +116,7 @@ export function PetalParticles() {
           g.rotation.set(slot.rx, slot.ry, slot.rz)
           petalState.current[i] = "resting"
         }
-      })
-    } else {
-      inited.current = true
-    }
+    })
 
     // Reset: any petal no longer in the set is parked out of sight so it can fall
     // again later. (Tending / blooming clears the whole floor this way.)
@@ -137,7 +131,7 @@ export function PetalParticles() {
         petalState.current[i] = "hidden"
       }
     })
-  }, [petalsFallen, slots])
+  }, [petalsFallen, lastAddedPetal, slots])
 
   if (petalGeometries.length === 0) return null
 

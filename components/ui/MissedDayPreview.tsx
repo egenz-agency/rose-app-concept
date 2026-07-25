@@ -5,7 +5,7 @@ import { useSceneStore } from "@/lib/store/sceneStore"
 
 const MAX_PETALS = 40
 
-// A hands-on preview of the "a petal falls each hour" mechanic: every press
+// A hands-on preview of the "a petal falls every 3 hours" mechanic: every press
 // drops one more petal onto the glass-dome floor, so pressing repeatedly lets
 // you watch them accumulate without waiting real hours. Once all 40 have
 // fallen, the next press clears the floor and starts over. Nothing is saved.
@@ -87,7 +87,7 @@ export function MissedDayPreview() {
             >
               {caption === "reset"
                 ? "A new beginning — the petals return."
-                : "An hour without you, and a petal falls."}
+                : "Hours without you, and a petal falls."}
             </p>
           </motion.div>
         )}
