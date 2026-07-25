@@ -150,10 +150,10 @@ export function PetalParticles() {
           <group key={i} ref={(el) => { groupRefs.current[i] = el }} position={[0, -8, 0]}>
             <mesh geometry={geometry} castShadow receiveShadow>
               <meshStandardMaterial
-                color="#9a0b2c"
-                emissive="#43000f"
-                emissiveIntensity={0.45}
-                roughness={0.55}
+                color="#e29aa8"
+                emissive="#b0546a"
+                emissiveIntensity={0.3}
+                roughness={0.5}
                 metalness={0.0}
                 transparent
                 opacity={fallen ? 0.94 : 0}
