@@ -52,7 +52,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body className="h-full overflow-hidden">
+      {/* suppressHydrationWarning: browser extensions (e.g. Grammarly) inject
+          data-* attributes onto <body> before React hydrates, which React would
+          otherwise report as a hydration mismatch. This suppresses only <body>'s
+          own attribute diff — one level deep — not its children. */}
+      <body className="h-full overflow-hidden" suppressHydrationWarning>
         <PWARegister />
         {children}
         <CookieNotice />

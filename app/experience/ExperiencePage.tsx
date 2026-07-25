@@ -21,9 +21,21 @@ import { SceneErrorBoundary } from "@/components/scene/SceneErrorBoundary"
 import { useSceneStore, type TenantConfig } from "@/lib/store/sceneStore"
 import { fetchRoseState, recordVisit } from "@/lib/data/roseApi"
 import { useQueryClient } from "@tanstack/react-query"
+import { differenceInHours, parseISO } from "date-fns"
 
 const HOLD_DURATION_MS = 1500
 const CLICK_THRESHOLD_MS = 200 // pointer released before this → treat as click (dome lift)
+const MAX_PETALS = 40
+// One petal falls for every HOURS_PER_PETAL hours the rose goes untended.
+const HOURS_PER_PETAL = 3
+
+// How many petals should be lying on the dome floor given how long the rose has
+// gone untended: one per 3 whole hours since the last visit, capped at MAX_PETALS.
+function fallenFromElapsed(lastVisited: string | null): number {
+  if (!lastVisited) return 0
+  const hours = differenceInHours(new Date(), parseISO(lastVisited))
+  return Math.max(0, Math.min(MAX_PETALS, Math.floor(hours / HOURS_PER_PETAL)))
+}
 
 const SceneRoot = dynamic(
   () => import("@/components/scene/SceneRoot").then((m) => m.SceneRoot),
@@ -66,11 +78,30 @@ function ExperienceInner({ slug, config }: { slug?: string; config?: TenantConfi
       .then((rose) => {
         if (rose) {
           setRose(rose)
-          setFallenPetals(Array.from({ length: 40 - rose.petalsRemaining }, (_, i) => i))
+          // Seed the floor with however many petals have fallen since her last
+          // visit (one per 3 hours). These settle silently — they fell while away.
+          const n = fallenFromElapsed(rose.lastVisited)
+          setFallenPetals(Array.from({ length: n }, (_, i) => i))
         }
       })
       .catch(() => {})
   }, [setRose, setFallenPetals])
+
+  // While the experience is open, drop one more petal every 3 hours the rose
+  // stays untended, until the floor is full. Runs off real elapsed time so it
+  // stays correct across reloads and matches what the Preview button shows.
+  useEffect(() => {
+    const tick = () => {
+      const { rose, petalsFallen, addFallenPetal } = useSceneStore.getState()
+      if (!rose) return
+      const target = fallenFromElapsed(rose.lastVisited)
+      if (petalsFallen.length < target && petalsFallen.length < MAX_PETALS) {
+        addFallenPetal(petalsFallen.length) // one at a time → each drops gracefully
+      }
+    }
+    const id = window.setInterval(tick, 60_000) // check once a minute
+    return () => window.clearInterval(id)
+  }, [])
 
   // INTRO_ANIMATION → ROSE_REVEAL
   useEffect(() => {
@@ -104,15 +135,17 @@ function ExperienceInner({ slug, config }: { slug?: string; config?: TenantConfi
     setDomeLifted(true)
     setViewPreset("close")
     triggerBloom()
+    // Blooming clears the floor: the fallen petals return to the rose.
+    setFallenPetals([])
 
-    // Press-and-hold IS tending the rose: record the visit. This drops petals
-    // for missed days, advances the chapter, and surfaces any scheduled
-    // message / moment the owner pre-loaded for today.
+    // Press-and-hold IS tending the rose: record the visit. This advances the
+    // chapter and surfaces any scheduled message / moment the owner pre-loaded
+    // for today. Tending resets last_visited, so the floor stays clear.
     recordVisit()
       .then((result) => {
         setRose(result.rose)
         setDailyMessage(result.message)
-        setFallenPetals(Array.from({ length: 40 - result.rose.petalsRemaining }, (_, i) => i))
+        setFallenPetals([])
         queryClient.invalidateQueries({ queryKey: ["rose-state"] })
         if (result.moment) {
           // Reveal it once the bloom has settled

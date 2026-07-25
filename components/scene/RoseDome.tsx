@@ -2,11 +2,11 @@
 import { useRef, useMemo, useEffect } from "react"
 import { useFrame } from "@react-three/fiber"
 import { useGLTF } from "@react-three/drei"
-import { RigidBody } from "@react-three/rapier"
 import * as THREE from "three"
 import { gsap } from "gsap"
 import { useSceneStore } from "@/lib/store/sceneStore"
 import { PetalParticles } from "./PetalParticles"
+import { SafeSceneChild } from "./SafeSceneChild"
 
 interface RoseDomeProps {
   onDomePointerDown?: () => void
@@ -69,8 +69,26 @@ export function RoseDome({ onDomePointerDown, onDomePointerUp }: RoseDomeProps) 
       const name   = (rawMat?.name ?? "").toLowerCase()
 
       if (name.includes("table")) {
-        // Hide the GLB table — we don't want the cylinder base
-        child.visible = false
+        // The GLB "table" is the glass-dome floor — keep it visible so fallen
+        // petals have a real surface to land on and rest against. The raw table
+        // is ~1.8× wider than the dome, so shrink its footprint (X/Z only) to
+        // match the glass base (~0.75 vs 1.36 world radius). Guarded so React's
+        // dev double-invoke can't apply the shrink twice.
+        child.visible = true
+        child.receiveShadow = true
+        if (!child.userData._floorScaled) {
+          child.scale.x *= 0.56
+          child.scale.z *= 0.56
+          child.userData._floorScaled = true
+        }
+        // A warm dark-brown base that contrasts with the pink petals resting on
+        // it (a lightly-polished surface that still catches the rose's glow).
+        child.material = new THREE.MeshStandardMaterial({
+          color: new THREE.Color("#3a2414"),
+          roughness: 0.55,
+          metalness: 0.15,
+          envMapIntensity: 0.4,
+        })
 
       } else if (name.includes("rose") && !name.includes("glass")) {
         const mat = (rawMat as THREE.MeshStandardMaterial).clone()
@@ -207,21 +225,21 @@ export function RoseDome({ onDomePointerDown, onDomePointerUp }: RoseDomeProps) 
   })
 
   return (
-    <group ref={groupRef} position={[0, 0, 0]}>
+    <>
+      {/* Fallen petals live in a stable frame — NOT inside the rotating rose
+          group — so they settle onto the dome floor and stay put (they rest at a
+          fixed spot while the symmetric table turns beneath them). */}
+      <group position={[0, 0, 0]}>
+        <SafeSceneChild>
+          <PetalParticles />
+        </SafeSceneChild>
+      </group>
 
-      {/* Invisible physics floor so petal particles have somewhere to land */}
-      <RigidBody type="fixed" colliders="cuboid">
-        <mesh position={[0, -0.02, 0]} visible={false}>
-          <boxGeometry args={[4, 0.04, 4]} />
-          <meshBasicMaterial />
-        </mesh>
-      </RigidBody>
+      <group ref={groupRef} position={[0, 0, 0]}>
 
-      {/* Full GLB scene: rose + glass dome (table hidden). The dome stays full
-          size; only the rose mesh scales with growth (handled in an effect). */}
+      {/* Full GLB scene: rose + glass dome + table floor. The whole dome slowly
+          turns; only the rose mesh scales with growth (handled in an effect). */}
       <primitive object={clonedScene} scale={SCENE_SCALE} />
-
-      <PetalParticles />
 
       {/* Invisible hit target for press-and-hold pointer events.
           Persists after the dome is removed so holding the bare rose still works.
@@ -247,7 +265,8 @@ export function RoseDome({ onDomePointerDown, onDomePointerUp }: RoseDomeProps) 
         distance={DOME_HEIGHT * 1.0}
         decay={2.2}
       />
-    </group>
+      </group>
+    </>
   )
 }
 

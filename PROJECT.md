@@ -552,6 +552,30 @@ Letters are seeded in `supabase/migrations/002_seed.sql`. He can add more direct
 
 ---
 
+## Falling Petals
+
+Petals fall onto the **glass-dome floor** as the rose goes untended, and stay there until it's cared for.
+
+- **Rate:** one petal every **3 hours** since `last_visited` (`HOURS_PER_PETAL` in `ExperiencePage.tsx`), capped at 40. Derived from real elapsed time, so it's correct across reloads.
+- **On open:** the floor is seeded with however many petals are already due — they appear **already resting** on the floor, with **no falling animation** (they fell while she was away).
+- **Only a petal falling *now* animates.** The store distinguishes intent: `addFallenPetal()` sets `lastAddedPetal` (that one petal drifts down), while `setFallenPetals()` clears it (bulk sync / reset → silent placement). `PetalParticles` animates only `i === lastAddedPetal`.
+- **Cleared by:** tending (`CarePanel`) and the press-and-hold bloom (`runMagic`) — both call `setFallenPetals([])`.
+- **Motion:** driven by **GSAP tweens, not physics** — each petal drifts from the bloom to a fixed slot on the floor (golden-angle scatter) and rests there. Rapier bodies desynced inside the rotating rose group and never settled.
+- **The floor** is the GLB "table" mesh, kept visible, its X/Z footprint scaled to ~0.56 to match the glass base, and given a warm dark-brown material so it contrasts with the pink petals.
+
+---
+
+## Streak
+
+The streak is a **running count of days cared for**, stored in `rose_state.streak_days`. The database is the single source of truth.
+
+- **Display:** read from the DB on every open and shown by `StreakBadge` / `CarePanel`. Nothing on the client derives or overrides it.
+- **Increment:** the first tend of a **new day** does `streak_days = streak_days + 1`. Tending again the same day does not change it.
+- **Reset only on death:** resets to `0` **only when the rose dies** — after **3 days in a row without a visit**, or if all petals fall. Normal daily use never resets it.
+- Applied in **both** `recordVisit()` paths: `lib/server/tenantQueries.ts` (tenant-scoped) and `lib/supabase/queries.ts` (legacy single-tenant).
+
+---
+
 ## Known Issues & Notes
 
 ### SceneErrorBoundary
