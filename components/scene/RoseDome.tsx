@@ -81,6 +81,15 @@ export function RoseDome({ onDomePointerDown, onDomePointerUp }: RoseDomeProps) 
           child.scale.z *= 0.56
           child.userData._floorScaled = true
         }
+        // Match the floor to the dark glass dome (near-black, glossy) instead of
+        // the warm GLB wood — a dark, softly-polished base that catches the
+        // rose's inner glow, so it reads as part of the same object.
+        child.material = new THREE.MeshStandardMaterial({
+          color: new THREE.Color("#160a10"),
+          roughness: 0.3,
+          metalness: 0.4,
+          envMapIntensity: 0.6,
+        })
 
       } else if (name.includes("rose") && !name.includes("glass")) {
         const mat = (rawMat as THREE.MeshStandardMaterial).clone()
