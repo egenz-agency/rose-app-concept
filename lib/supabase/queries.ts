@@ -453,13 +453,14 @@ export async function recordVisit(): Promise<{
   const daysMissed = lastVisit ? Math.max(0, differenceInDays(now, lastVisit) - 1) : 0
   const petalsToDrop = Math.min(daysMissed, current.petals_remaining)
   const newPetals = Math.max(0, current.petals_remaining - petalsToDrop)
-  // Streak is a running count kept in the DB. This branch only runs on the FIRST
-  // tend of a new day (isFirstToday), so each real day of care adds exactly one.
-  // We deliberately never reset it — the DB value is the single source of truth,
-  // read on every open and incremented here when she cares for the rose.
-  const newStreak = current.streak_days + 1
-  const isDead = newPetals === 0
+  // The rose dies after 3 days in a row without a visit (or if every petal has
+  // fallen). Death is the ONLY thing that breaks the streak.
+  const isDead = newPetals === 0 || daysMissed >= 3
   const isFinalDeath = isDead && current.revivals_remaining === 0
+  // Streak: a running count kept in the DB (the single source of truth, read on
+  // every open). This branch runs only on the FIRST tend of a new day, so each
+  // day of care adds exactly one — and it resets to 0 ONLY when the rose died.
+  const newStreak = isDead ? 0 : current.streak_days + 1
 
   // Garden stage progression
   const newTotalVisits = current.total_visits + 1

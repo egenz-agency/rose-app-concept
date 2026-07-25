@@ -1,36 +1,44 @@
 "use client"
 import { useRef, useEffect, useMemo } from "react"
-import { RigidBody, RapierRigidBody } from "@react-three/rapier"
 import { useGLTF } from "@react-three/drei"
 import * as THREE from "three"
+import { gsap } from "gsap"
 import { useSceneStore } from "@/lib/store/sceneStore"
 
 const MAX_PETALS = 40
 
-// Largest footprint (in world units) a normalised petal should span. Matches the
-// previous flat-box petal (~0.15 wide) so the swap keeps the same visual scale.
+// Largest footprint (world units) a normalised petal should span.
 const PETAL_SIZE = 0.16
+// Resting height — just above the visible table/dome floor (surface ≈ y 0.03).
+const FLOOR_Y = 0.05
+// Where a petal detaches from the bloom before it drifts down.
+const BLOOM_Y = 1.15
 
-// Petals that have fallen off the rose onto the glass-dome floor. One petal
-// falls per hour the rose goes untended (Beauty-&-the-Beast style); tending or
-// blooming clears them. `petalsFallen` (store) holds the fallen indices — each
-// newly-added one drifts down from the bloom and settles on the floor, where it
-// stays and accumulates until the rose is cared for.
+// Deterministic pseudo-random in [0,1) per (petal index, salt) — keeps each
+// petal's resting slot and tumble stable across renders.
+function rand(i: number, salt: number): number {
+  const x = Math.sin(i * 12.9898 + salt * 78.233) * 43758.5453
+  return x - Math.floor(x)
+}
+
+// Petals that have fallen onto the glass-dome floor. One petal falls per hour the
+// rose goes untended (Beauty-&-the-Beast style); tending or blooming clears them.
+// Each newly-fallen petal drifts down from the bloom and SETTLES on the floor,
+// where it stays and accumulates until the rose is cared for. Driven by GSAP
+// tweens (not physics) so landing is deterministic and reliable.
 export function PetalParticles() {
   const petalsFallen = useSceneStore((s) => s.petalsFallen)
-  const bodyRefs = useRef<(RapierRigidBody | null)[]>([])
-  const released = useRef<Set<number>>(new Set())
-  // Have we absorbed the first non-empty petalsFallen sync yet? The initial
-  // state (already-missed days) must NOT animate — only single petals dropped
-  // afterwards (the "Preview a missed day" button) get the falling animation.
+  const groupRefs = useRef<(THREE.Group | null)[]>([])
+  // "hidden" (parked out of sight) → "falling" (mid-drift) → "resting" (on floor)
+  const petalState = useRef<("hidden" | "falling" | "resting")[]>(
+    Array(MAX_PETALS).fill("hidden")
+  )
   const inited = useRef(false)
 
   const { scene } = useGLTF("/models/rose-petals.glb")
 
-  // Pull the modelled petal meshes (petal1…petal8) out of the imported scene and
-  // normalise each: centre it on the origin and scale so its largest dimension is
-  // PETAL_SIZE. This makes every petal a self-contained, origin-centred geometry
-  // we can drop into a RigidBody regardless of where it sat in the source file.
+  // Pull the modelled petal meshes (petal1…petal8), centre + normalise each so it
+  // is a self-contained, origin-centred geometry we can place anywhere.
   const petalGeometries = useMemo(() => {
     const geoms: THREE.BufferGeometry[] = []
     scene.traverse((child) => {
@@ -50,64 +58,86 @@ export function PetalParticles() {
         geoms.push(geo)
       }
     })
-    // Keep a stable order so petal index → shape mapping is deterministic.
     return geoms
   }, [scene])
 
-  useEffect(() => {
-    const newlyFallen = petalsFallen.filter((i) => !released.current.has(i))
-
-    if (newlyFallen.length > 0) {
-      // Only a SINGLE petal added after the initial sync animates a graceful
-      // fall (the preview button / one missed day). The first sync and any bulk
-      // change settle silently onto the ground — no start-up cascade.
-      const isFirstSync = !inited.current
-      inited.current = true
-      const animate = !isFirstSync && newlyFallen.length === 1
-
-      if (animate) {
-        const i = newlyFallen[0]
-        released.current.add(i)
-        const body = bodyRefs.current[i]
-        if (body) {
-          const angle = Math.random() * Math.PI * 2
-          const rad = 0.12 + Math.random() * 0.28
-          body.setTranslation(
-            { x: Math.cos(angle) * rad, y: 1.3 + Math.random() * 0.3, z: Math.sin(angle) * rad },
-            true
-          )
-          body.setLinvel({ x: (Math.random() - 0.5) * 0.3, y: -0.05, z: (Math.random() - 0.5) * 0.3 }, true)
-          body.setAngvel(
-            { x: (Math.random() - 0.5) * 2.5, y: (Math.random() - 0.5) * 2.5, z: (Math.random() - 0.5) * 2.5 },
-            true
-          )
+  // A stable resting slot for each petal: scattered around the base (golden angle)
+  // and lying at a natural angle on the floor.
+  const slots = useMemo(
+    () =>
+      Array.from({ length: MAX_PETALS }, (_, i) => {
+        const angle = i * 2.399963 // golden angle
+        const radius = 0.12 + ((i * 0.37) % 1) * 0.42 // 0.12–0.54, inside the dome
+        return {
+          x: Math.cos(angle) * radius,
+          z: Math.sin(angle) * radius,
+          rx: -Math.PI / 2 + (rand(i, 1) - 0.5) * 0.7, // lie broadly flat, varied
+          ry: rand(i, 2) * Math.PI * 2,
+          rz: (rand(i, 3) - 0.5) * 0.7,
         }
-      } else {
-        // Place each petal at rest on the ground with no motion, scattered
-        // around the base via the golden angle so they don't overlap.
-        newlyFallen.forEach((i) => {
-          released.current.add(i)
-          const body = bodyRefs.current[i]
-          if (!body) return
-          const angle = i * 2.399963           // golden angle (radians)
-          const rad = 0.18 + ((i * 0.11) % 0.32)
-          body.setTranslation({ x: Math.cos(angle) * rad, y: 0.02, z: Math.sin(angle) * rad }, true)
-          body.setLinvel({ x: 0, y: 0, z: 0 }, true)
-          body.setAngvel({ x: 0, y: 0, z: 0 }, true)
-        })
-      }
+      }),
+    []
+  )
+
+  useEffect(() => {
+    const fallenSet = new Set(petalsFallen)
+    const newly = petalsFallen.filter((i) => petalState.current[i] === "hidden")
+
+    if (newly.length > 0) {
+      // Only a single petal added AFTER the initial sync gets the falling
+      // animation (the Preview button / one missed hour). The first sync and any
+      // bulk change settle silently — those petals fell while she was away.
+      const animate = inited.current && newly.length === 1
+      inited.current = true
+
+      newly.forEach((i) => {
+        const g = groupRefs.current[i]
+        if (!g) return
+        const slot = slots[i]
+        gsap.killTweensOf(g.position)
+        gsap.killTweensOf(g.rotation)
+
+        if (animate) {
+          petalState.current[i] = "falling"
+          const a = Math.random() * Math.PI * 2
+          const rr = 0.04 + Math.random() * 0.12
+          g.position.set(Math.cos(a) * rr, BLOOM_Y, Math.sin(a) * rr)
+          g.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI)
+          // Drift down to the resting slot, accelerating gently like a real petal.
+          gsap.to(g.position, {
+            x: slot.x, y: FLOOR_Y, z: slot.z,
+            duration: 2.6, ease: "power1.in",
+            onComplete: () => { petalState.current[i] = "resting" },
+          })
+          gsap.to(g.rotation, {
+            x: slot.rx, y: slot.ry, z: slot.rz,
+            duration: 2.8, ease: "power2.out",
+          })
+        } else {
+          // Place directly at rest on the floor, no animation.
+          g.position.set(slot.x, FLOOR_Y, slot.z)
+          g.rotation.set(slot.rx, slot.ry, slot.rz)
+          petalState.current[i] = "resting"
+        }
+      })
+    } else {
+      inited.current = true
     }
 
-    // Park any petals that were removed from the set (e.g. a preview reset),
-    // moving them out of sight so they can fall again on a later preview.
-    released.current.forEach((i) => {
-      if (!petalsFallen.includes(i)) {
-        released.current.delete(i)
-        const body = bodyRefs.current[i]
-        if (body) body.setTranslation({ x: 0, y: -8, z: 0 }, true)
+    // Reset: any petal no longer in the set is parked out of sight so it can fall
+    // again later. (Tending / blooming clears the whole floor this way.)
+    petalState.current.forEach((st, i) => {
+      if (st !== "hidden" && !fallenSet.has(i)) {
+        const g = groupRefs.current[i]
+        if (g) {
+          gsap.killTweensOf(g.position)
+          gsap.killTweensOf(g.rotation)
+          g.position.set(0, -8, 0)
+        }
+        petalState.current[i] = "hidden"
       }
     })
-  }, [petalsFallen])
+  }, [petalsFallen, slots])
 
   if (petalGeometries.length === 0) return null
 
@@ -117,18 +147,8 @@ export function PetalParticles() {
         const fallen = petalsFallen.includes(i)
         const geometry = petalGeometries[i % petalGeometries.length]
         return (
-          <RigidBody
-            key={i}
-            ref={(el) => { bodyRefs.current[i] = el }}
-            type={fallen ? "dynamic" : "fixed"}
-            position={[0, -8, 0]}          // parked out of sight until it falls
-            colliders="hull"
-            restitution={0.05}             // barely bounces → settles on the floor
-            friction={0.9}
-            linearDamping={0.55}           // gentle drift, but reaches the floor in a few seconds
-            angularDamping={1.4}
-          >
-            <mesh geometry={geometry} castShadow>
+          <group key={i} ref={(el) => { groupRefs.current[i] = el }} position={[0, -8, 0]}>
+            <mesh geometry={geometry} castShadow receiveShadow>
               <meshStandardMaterial
                 color="#9a0b2c"
                 emissive="#43000f"
@@ -136,11 +156,11 @@ export function PetalParticles() {
                 roughness={0.55}
                 metalness={0.0}
                 transparent
-                opacity={fallen ? 0.92 : 0}
+                opacity={fallen ? 0.94 : 0}
                 side={THREE.DoubleSide}
               />
             </mesh>
-          </RigidBody>
+          </group>
         )
       })}
     </>

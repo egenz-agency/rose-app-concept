@@ -570,7 +570,7 @@ The streak is a **running count of days cared for**, stored in `rose_state.strea
 
 - **Display:** read from the DB on every open (`fetchRoseState()` → `rose.streakDays`) and shown by `StreakBadge` (idle) and in `CarePanel`. Nothing on the client derives or overrides it.
 - **Increment:** in `recordVisit()`, the first tend of a **new day** (`isFirstToday`, based on `isToday(last_visited)`) sets `streak_days = streak_days + 1`. Tending again the same day does not change it.
-- **No reset:** the streak is never reset. (The earlier bug reset it to `1` unless the gap since the last visit was exactly 24–48h, so normal daily use kept wiping it — fixed to a plain `+1`.)
+- **Reset only on death:** the streak resets to `0` **only when the rose dies** — which happens after **3 days in a row without a visit** (or if all petals fall). Normal daily use never resets it. (The earlier bug reset it to `1` unless the gap since the last visit was exactly 24–48h, so ordinary use kept wiping it.)
 - To set a specific value, update `rose_state.streak_days` directly in Supabase.
 
 ---
