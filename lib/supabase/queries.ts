@@ -453,7 +453,11 @@ export async function recordVisit(): Promise<{
   const daysMissed = lastVisit ? Math.max(0, differenceInDays(now, lastVisit) - 1) : 0
   const petalsToDrop = Math.min(daysMissed, current.petals_remaining)
   const newPetals = Math.max(0, current.petals_remaining - petalsToDrop)
-  const newStreak = lastVisit && differenceInDays(now, lastVisit) === 1 ? current.streak_days + 1 : 1
+  // Streak is a running count kept in the DB. This branch only runs on the FIRST
+  // tend of a new day (isFirstToday), so each real day of care adds exactly one.
+  // We deliberately never reset it — the DB value is the single source of truth,
+  // read on every open and incremented here when she cares for the rose.
+  const newStreak = current.streak_days + 1
   const isDead = newPetals === 0
   const isFinalDeath = isDead && current.revivals_remaining === 0
 

@@ -57,7 +57,8 @@ rose_state          -- single row (id = 00000000-0000-0000-0000-000000000001)
   petals_remaining  -- integer 0–40
   revivals_remaining -- integer 0–3
   last_visited      -- timestamptz
-  streak_days       -- integer
+  streak_days       -- integer  (running count; +1 on the first tend of each new
+                    --           day, read on every open — see "Streak" below)
   total_visits      -- integer
   is_dead           -- boolean
   is_final_death    -- boolean
@@ -69,9 +70,20 @@ memory_stars        -- player-created constellation points
 gallery_photos      -- photo gallery
 visit_log           -- every visit logged
 daily_videos        -- videos he uploads for her daily visits
+
+push_subscriptions  -- one row per installed device (the "I miss you" feature)
+  person            -- display name the device claimed on enable
+  endpoint          -- unique; the Web Push endpoint
+  p256dh, auth      -- Web Push encryption keys
+  user_agent, created_at, updated_at
+
+app_config          -- server-only key/value (NO anon policy — service role only)
+  key, value        -- holds vapid_public_key / vapid_private_key / vapid_subject
 ```
 
-RLS is enabled on all tables with open `allow all` policies (single-user, no auth needed).
+RLS is enabled on all tables with open `allow all` policies (single-user, no auth needed) — **except `app_config`**, which has RLS on with **no policy**, so anon/public cannot read it; only the edge function's service role (which bypasses RLS) can.
+
+**Edge function:** `send-miss-you` — sends the "I miss you" push to the other person (see the feature section below).
 
 ---
 
@@ -549,6 +561,51 @@ Letters are seeded in `supabase/migrations/002_seed.sql`. He can add more direct
 | 2 | 90 | 6 glowing butterfly quads |
 | 3 | 180 | Outer garden bed ring |
 | 4 | 365 | Greenhouse glow (colored point lights) |
+
+---
+
+## Streak
+
+The streak is a **running count of days cared for**, stored in `rose_state.streak_days`. The database is the single source of truth.
+
+- **Display:** read from the DB on every open (`fetchRoseState()` → `rose.streakDays`) and shown by `StreakBadge` (idle) and in `CarePanel`. Nothing on the client derives or overrides it.
+- **Increment:** in `recordVisit()`, the first tend of a **new day** (`isFirstToday`, based on `isToday(last_visited)`) sets `streak_days = streak_days + 1`. Tending again the same day does not change it.
+- **No reset:** the streak is never reset. (The earlier bug reset it to `1` unless the gap since the last visit was exactly 24–48h, so normal daily use kept wiping it — fixed to a plain `+1`.)
+- To set a specific value, update `rose_state.streak_days` directly in Supabase.
+
+---
+
+## "I Miss You" Feature
+
+A two-way, low-friction way for the two people to say *"I miss you"*: one taps a heart, the other's phone buzzes with a push notification. Repeatable — rapid taps batch into a single "×N" ping.
+
+### Where it lives
+- **Her rose (`/`):** a floating `💗 I miss you` pill in the idle scene (`MissYouButton` — `variant="floating"`, gated on `phase === "IDLE"`).
+- **His admin (`/rosesecret`):** an "Across the distance" card at the top of the panel (`MissYouButton` — `variant="inline"`, no phase gate). Same logic, embedded UI.
+
+### How it works (flow)
+1. **Enable (once per device):** the first tap opens a panel asking for the person's name + notification permission. On allow, the browser creates a Web Push subscription; it's saved to `push_subscriptions` tagged with that name, and the name is cached in `localStorage` (`missYou.name`).
+2. **Send:** tapping "I miss you" batches taps for `BATCH_MS` (3.5s), then calls the `send-miss-you` edge function with `{ fromName, count }`.
+3. **Route:** the edge function (service role) loads the VAPID keys from `app_config`, finds every subscription where `person != fromName` (i.e. the *other* person), and sends each a Web Push via `npm:web-push`. Expired subs (404/410) are pruned.
+4. **Receive:** the service worker's `push` handler shows the notification (`"{fromName} misses you ×N 💗"`); `notificationclick` focuses/opens the app.
+
+### Pieces
+| Piece | File |
+|---|---|
+| Client logic (support/permission/subscribe/send) | `lib/push/missYou.ts` |
+| Button + enable panel + tap batching + feedback | `components/ui/MissYouButton.tsx` |
+| Service worker push + notificationclick handlers | `public/sw.js` |
+| Sender (routes to the other person) | Supabase edge function `send-miss-you` |
+| Subscriptions + VAPID key storage | `push_subscriptions`, `app_config` tables |
+
+### Keys
+- **VAPID public key** ships in the client (`VAPID_PUBLIC_KEY` in `lib/push/missYou.ts`) — safe to expose.
+- **VAPID private key** lives **only** in the `app_config` table (RLS-locked, read by the edge function's service role). Never in git.
+
+### Requirements / gotchas
+- **iOS:** Web Push only works for a PWA **installed to the home screen** on **iOS 16.4+** — not in a Safari tab.
+- **Distinct names:** routing is "send to whoever isn't me," so each device must claim a **different** name (e.g. "Stella" vs his name).
+- **Admin as its own PWA:** `/rosesecret` has its own manifest (`public/admin.webmanifest`, name "Rose Keeper", `start_url: /rosesecret`) and apple-web-app title via `app/rosesecret/layout.tsx`, so installing from there lands on the admin, separate from her rose app at `/`.
 
 ---
 
