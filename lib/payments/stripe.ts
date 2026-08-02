@@ -1,5 +1,6 @@
 import "server-only"
 import Stripe from "stripe"
+import { PLANS, DEFAULT_PLAN, type Plan } from "./plans"
 
 // Server-only Stripe client. The secret key must never reach the browser (the
 // `server-only` import above turns that into a build error).
@@ -10,8 +11,8 @@ import Stripe from "stripe"
 
 let stripe: Stripe | null = null
 
-export function isStripeConfigured(): boolean {
-  return Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID)
+export function isStripeConfigured(plan: Plan = PLANS[DEFAULT_PLAN]): boolean {
+  return Boolean(process.env.STRIPE_SECRET_KEY && process.env[plan.priceEnvVar])
 }
 
 export function getStripe(): Stripe {
@@ -25,12 +26,16 @@ export function getStripe(): Stripe {
   return stripe
 }
 
-// The one-off price for a year of one gift. Created in the Stripe dashboard; we
-// only ever reference it by id so the amount/currency live in one place.
-export function getPriceId(): string {
-  const price = process.env.STRIPE_PRICE_ID
+// The one-off price for a year of one gift, per package. Created in the Stripe
+// dashboard; we only ever reference it by id so amount and currency live in one
+// place. Each package names its own env var (see lib/payments/plans.ts), so
+// adding a tier never touches this function.
+export function getPriceId(plan: Plan = PLANS[DEFAULT_PLAN]): string {
+  const price = process.env[plan.priceEnvVar]
   if (!price) {
-    throw new Error("Payments are not configured — set STRIPE_PRICE_ID in the environment")
+    throw new Error(
+      `Payments are not configured for the "${plan.key}" package — set ${plan.priceEnvVar} in the environment`
+    )
   }
   return price
 }

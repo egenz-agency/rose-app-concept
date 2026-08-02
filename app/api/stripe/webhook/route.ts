@@ -1,6 +1,7 @@
 import type Stripe from "stripe"
 import { getStripe, getWebhookSecret } from "@/lib/payments/stripe"
 import { getAdminClient } from "@/lib/supabase/admin"
+import { planOf } from "@/lib/payments/plans"
 
 // Stripe webhook — the ONLY place a gift becomes paid.
 //
@@ -57,15 +58,21 @@ export async function POST(request: Request) {
       })
       if (error) throw new Error(error.message)
 
+      // Which package was bought. Recorded on the ledger row so revenue-by-package
+      // stays historically accurate, and on the gift so feature gating reads the
+      // tier the buyer actually paid for. An unknown value falls back to the base
+      // tier rather than writing something the app can't interpret.
+      const plan = planOf(session.metadata?.plan).key
+
       // Invoice id isn't known until the session completes, so it's attached
       // here rather than inside the (idempotent) grant above.
       const invoiceId = typeof session.invoice === "string" ? session.invoice : null
-      if (invoiceId) {
-        await admin
-          .from("gift_payments")
-          .update({ stripe_invoice_id: invoiceId })
-          .eq("stripe_session_id", session.id)
-      }
+      await admin
+        .from("gift_payments")
+        .update({ plan, ...(invoiceId ? { stripe_invoice_id: invoiceId } : {}) })
+        .eq("stripe_session_id", session.id)
+
+      await admin.from("tenants").update({ plan }).eq("id", tenantId)
 
       // Backfill the customer for gifts that predate the persistent-customer
       // change, so future renewals and invoices stay on one customer record.

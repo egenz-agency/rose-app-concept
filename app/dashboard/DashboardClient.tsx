@@ -20,8 +20,11 @@ export interface SignedMedia {
 }
 
 export function DashboardClient({
-  tenant, messages, moments, email, media,
-}: { tenant: Row; messages: Row[]; moments: Row[]; email: string; media: SignedMedia }) {
+  tenant, messages, moments, email, media, isOperator = false,
+}: {
+  tenant: Row; messages: Row[]; moments: Row[]; email: string
+  media: SignedMedia; isOperator?: boolean
+}) {
   const router = useRouter()
   const isLive = isGiftLive({
     status: String(tenant.status ?? "draft"),
@@ -36,7 +39,14 @@ export function DashboardClient({
 
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-          <span style={{ color: "rgba(242,236,224,0.45)", fontSize: 12, fontFamily: "'EB Garamond', serif" }}>{email}</span>
+          <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ color: "rgba(242,236,224,0.45)", fontSize: 12, fontFamily: "'EB Garamond', serif" }}>{email}</span>
+            {isOperator && (
+              <a href="/admin" style={{ ...ghostBtn, textDecoration: "none", borderColor: "rgba(232,200,130,0.4)", color: "#e8c882" }}>
+                Operator
+              </a>
+            )}
+          </span>
           <form action={async () => { await signOutAction(); router.replace("/login") }}>
             <button type="submit" style={ghostBtn}>Sign out</button>
           </form>

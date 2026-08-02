@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { getSaasBrowserClient } from "@/lib/supabase/saasBrowser"
+import { Turnstile, captchaEnabled, useTurnstileReset } from "@/components/auth/Turnstile"
 
 type Mode = "signin" | "signup" | "magic"
 
@@ -18,6 +19,12 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // CAPTCHA token for the auth call. Signup and magic-link both send email, so
+  // without this the form can be used to mail arbitrary strangers from our
+  // domain. Sign-in is covered too because Supabase requires the token on every
+  // auth endpoint once CAPTCHA is switched on for the project.
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const resetCaptcha = useTurnstileReset()
 
   // If already signed in, skip straight to the dashboard.
   useEffect(() => {
@@ -56,20 +63,29 @@ export default function LoginPage() {
     if (mode !== "magic" && password.length < 6) {
       setError("Password must be at least 6 characters."); return
     }
+    if (captchaEnabled && !captchaToken) {
+      setError("Please complete the security check below."); return
+    }
 
     setBusy(true)
     try {
       const sb = getSaasBrowserClient()
 
       if (mode === "signin") {
-        const { error } = await sb.auth.signInWithPassword({ email: email.trim(), password })
+        const { error } = await sb.auth.signInWithPassword({
+          email: email.trim(), password,
+          options: { captchaToken: captchaToken ?? undefined },
+        })
         if (error) throw error
         router.push("/dashboard"); router.refresh()
         return
       }
 
       if (mode === "signup") {
-        const { data, error } = await sb.auth.signUp({ email: email.trim(), password })
+        const { data, error } = await sb.auth.signUp({
+          email: email.trim(), password,
+          options: { captchaToken: captchaToken ?? undefined },
+        })
         if (error) throw error
 
         // Signing up with an address that already has an account does NOT error:
@@ -94,7 +110,10 @@ export default function LoginPage() {
       // magic
       const { error } = await sb.auth.signInWithOtp({
         email: email.trim(),
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          captchaToken: captchaToken ?? undefined,
+        },
       })
       if (error) throw error
       setMsg("Check your email for a magic link 🌹")
@@ -113,6 +132,10 @@ export default function LoginPage() {
           : raw
       )
     } finally {
+      // Turnstile tokens are single use — a retry with a spent token always
+      // fails, so clear and re-arm the widget after every attempt.
+      setCaptchaToken(null)
+      resetCaptcha()
       setBusy(false)
     }
   }
@@ -170,6 +193,9 @@ export default function LoginPage() {
               <a href="/legal/privacy" target="_blank" rel="noreferrer" style={{ color: "rgba(232,200,130,0.8)" }}>Privacy Policy</a>.
             </span>
           </label>
+
+          {/* Renders nothing until NEXT_PUBLIC_TURNSTILE_SITE_KEY is set. */}
+          <Turnstile onToken={setCaptchaToken} onExpire={() => setCaptchaToken(null)} />
 
           <button type="submit" disabled={busy || !agreed} style={primaryBtn(busy || !agreed)}>
             {busy ? "…" : primaryLabel}

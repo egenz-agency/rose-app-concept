@@ -37,11 +37,28 @@ anything (while still not leaking which emails have accounts); the service worke
 caches dev chunks into a reload loop; `.githooks/pre-commit` blocks Stripe keys from being
 committed.
 
+**Operator console (`/admin`).** A single `masteradmin` — enforced by a unique index, so the
+database refuses a second one — sees revenue, the package breakdown and the signup funnel,
+and can create free roses without touching Stripe. Keyed on `user_id`, never on an email
+address, so changing your email keeps the role and nobody inherits it by re-registering the
+old address. Non-admins get a **404**, not a "forbidden" page. See *Operator console* below.
+
+**Packages.** `plan` now names the product tier (`regular` is the base) rather than the
+billing shape it used to hold. The catalogue is in `lib/payments/plans.ts`; adding a tier is
+one object plus one env var. The package is recorded on the payment as well as the gift, so
+upgrading someone never rewrites past revenue.
+
+**CAPTCHA.** Cloudflare Turnstile on signup, sign-in and magic-link. Signup and magic-link
+both email whatever address is typed in — without a challenge that's a spam cannon pointed at
+strangers, sent from our domain. Invisible for real users; inert until the site key is set.
+
 **Known gaps.** One account still manages only **one gift** (every dashboard query takes the
-oldest), so repeat purchases and self-testing need a second account. `STRIPE_AUTOMATIC_TAX`
-is off pending VAT registration. Custom SMTP is not configured, so Supabase's default sender
-won't reach real customers. The legacy single-tenant path (`/rosesecret`, the `roseApi`
-fallback) is dead code that should be deleted.
+oldest), so repeat purchases need a second account — the operator console works around this
+for your own testing. `STRIPE_AUTOMATIC_TAX` is off pending VAT registration. Custom SMTP is
+not configured, so Supabase's default sender won't reach real customers. The legacy
+single-tenant path (`/rosesecret`, the `roseApi` fallback, and the stale
+`NEXT_PUBLIC_SUPABASE_*` env vars pointing at the old project) is dead code that should be
+deleted.
 
 ---
 
@@ -816,6 +833,45 @@ storage **path**, and `lib/server/media.ts` mints a 6-hour signed URL at render 
 `/r/[slug]` and the dashboard, both *after* the gates. A public bucket was the hole here: a
 public URL outlives expiry, refund, and deletion, so "revoke their access" silently excluded
 the video and the song. Verified: public URL → 400, signed → 200, tampered token → 400.
+
+### Operator console (`/admin`)
+| Piece | File |
+|---|---|
+| Role check (never email-based) | `lib/server/admin.ts` |
+| Stats, gift list, free-rose creation | `app/admin/actions.ts` |
+| Console UI | `app/admin/AdminClient.tsx` |
+| Role table + single-admin index + stats query | `app_admins`, `admin_overview()` |
+
+Security: `app_admins` is RLS-locked with **no policy**, so a customer can't discover it
+exists. `admin_overview()`, `grant_complimentary_year()`, `record_gift_payment()` and
+`revoke_gift_payment()` all have `EXECUTE` revoked from `anon` and `authenticated` — verified
+by attempting each as a signed-in user. `/admin` returns **404** rather than 403, so the route
+never confirms itself. The dashboard's Operator link is cosmetic; the page guards itself.
+
+Free roses: `grant_complimentary_year(slug, note)` writes a **€0 ledger row** so comped gifts
+stay auditable and never inflate revenue. Reuses `record_gift_payment`, keeping entitlement
+maths in one place.
+
+To move masteradmin to another account, delete the row first — the unique index enforces one.
+
+### Packages (plans)
+`lib/payments/plans.ts` is the catalogue: one entry per tier, each naming its own
+`STRIPE_PRICE_ID*` env var and carrying **feature flags**, so gating reads
+`planOf(tenant.plan).features.moments` rather than scattering `plan === "premium"` string
+comparisons. `plan` is stored on the gift *and* the payment: a gift may be upgraded later, but
+revenue-by-package must reflect what was actually bought at the time.
+
+### CAPTCHA
+Cloudflare Turnstile on all three auth calls (`components/auth/Turnstile.tsx`). Verification
+happens in **Supabase** — no `siteverify` endpoint of our own. Notes:
+- Tokens are **single use**; the widget is reset after every attempt or a failed login can
+  never be retried.
+- Inert until `NEXT_PUBLIC_TURNSTILE_SITE_KEY` is set, so a missing key can't lock anyone out.
+- CSP allows `challenges.cloudflare.com` in `script-src` and `frame-src`.
+- **Order matters when enabling:** set the site key and confirm sign-in works *before*
+  switching CAPTCHA on in Supabase → Project Settings → Authentication → Bot and Abuse
+  Protection. Reversing it locks out every account until the toggle is switched back off.
+- The widget's domain list must include `localhost` or local sign-in fails.
 
 ### Stripe conventions this integration follows
 - **Never** pass `payment_method_types` — it would disable dynamic payment methods and lock

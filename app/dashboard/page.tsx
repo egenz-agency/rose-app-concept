@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { getSaasServerClient, getCurrentUser } from "@/lib/supabase/saasServer"
 import { signMedia } from "@/lib/server/media"
+import { getOperator } from "@/lib/server/admin"
 import { CreateGift } from "./CreateGift"
 import { DashboardClient } from "./DashboardClient"
 
@@ -37,6 +38,10 @@ export default async function DashboardPage() {
     signMedia(c.songUrl),
   ])
 
+  // Purely cosmetic: whether to show the console link. /admin does its own
+  // check and 404s regardless, so this never becomes the actual gate.
+  const isOperator = (await getOperator()) !== null
+
   return (
     <DashboardClient
       tenant={tenant}
@@ -44,6 +49,7 @@ export default async function DashboardPage() {
       moments={moments ?? []}
       email={user.email ?? ""}
       media={{ introVideoUrl, songUrl }}
+      isOperator={isOperator}
     />
   )
 }

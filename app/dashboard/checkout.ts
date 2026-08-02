@@ -3,6 +3,7 @@
 import { getSaasServerClient, getCurrentUser } from "@/lib/supabase/saasServer"
 import { enforceRateLimit } from "@/lib/security/ratelimit"
 import { getStripe, getPriceId, getBaseUrl, isAutomaticTaxEnabled } from "@/lib/payments/stripe"
+import { planOf, DEFAULT_PLAN, type PlanKey } from "@/lib/payments/plans"
 
 // Checkout for one gift-year. The buyer builds their gift for free; this is the
 // step that makes the share link work, and the same call renews a gift whose
@@ -21,6 +22,7 @@ interface TenantRow {
   id: string
   expires_at: string | null
   stripe_customer_id: string | null
+  plan: string | null
 }
 
 // One persistent Stripe Customer per buyer. Required for invoicing (a guest
@@ -48,14 +50,17 @@ async function getOrCreateCustomerId(
   return customer.id
 }
 
-export async function createCheckoutSessionAction(): Promise<{ url: string }> {
+export async function createCheckoutSessionAction(
+  planKey: PlanKey = DEFAULT_PLAN
+): Promise<{ url: string }> {
+  const plan = planOf(planKey)
   const user = await getCurrentUser()
   if (!user) throw new Error("Not signed in")
 
   const sb = await getSaasServerClient()
   const { data } = await sb
     .from("tenants")
-    .select("id, expires_at, stripe_customer_id")
+    .select("id, expires_at, stripe_customer_id, plan")
     .order("created_at", { ascending: true })
     .limit(1)
     .single()
@@ -70,7 +75,7 @@ export async function createCheckoutSessionAction(): Promise<{ url: string }> {
 
   const session = await getStripe().checkout.sessions.create({
     mode: "payment",
-    line_items: [{ price: getPriceId(), quantity: 1 }],
+    line_items: [{ price: getPriceId(plan), quantity: 1 }],
     customer: customerId,
     // NOTE: `payment_method_types` is deliberately omitted so Stripe picks the
     // eligible methods per buyer (dynamic payment methods). Hardcoding it would
@@ -81,6 +86,10 @@ export async function createCheckoutSessionAction(): Promise<{ url: string }> {
       tenant_id: tenant.id,
       user_id: user.id,
       kind: isRenewal ? "renewal" : "initial",
+      // Which package this payment is for. The webhook records it against both
+      // the gift and the ledger row, so revenue-by-package stays accurate even
+      // if the gift is later upgraded to a different tier.
+      plan: plan.key,
     },
 
     // VAT/GST — off until STRIPE_AUTOMATIC_TAX=true (see isAutomaticTaxEnabled).
