@@ -2,6 +2,7 @@ import "server-only"
 import { cookies } from "next/headers"
 import { timingSafeEqual } from "crypto"
 import { getTenantBySlug, type TenantRecord } from "@/lib/server/tenantQueries"
+import { isGiftLive } from "@/lib/payments/entitlement"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Gift access control.
@@ -36,12 +37,15 @@ export async function readGiftCookie(slug: string): Promise<string | null> {
   return store.get(giftCookieName(slug))?.value ?? null
 }
 
-// Returns the tenant only if the caller holds a valid token cookie for it and the
-// gift is live. Otherwise null — callers should treat that as "no such gift".
+// Returns the tenant only if the caller holds a valid token cookie for it AND the
+// gift is entitled — paid for and inside its year. Otherwise null; callers treat
+// that as "no such gift". An unpaid draft or a lapsed gift is therefore
+// indistinguishable from one that never existed, which is deliberate: the
+// recipient should never be shown a paywall meant for the buyer.
 export async function getAccessibleTenant(slug: string): Promise<TenantRecord | null> {
   if (typeof slug !== "string" || !/^[a-z0-9-]{1,64}$/.test(slug)) return null
   const tenant = await getTenantBySlug(slug)
-  if (!tenant || tenant.status === "suspended") return null
+  if (!tenant || !isGiftLive(tenant)) return null
   const presented = await readGiftCookie(slug)
   if (!tokensMatch(presented, tenant.access_token)) return null
   return tenant

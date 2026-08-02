@@ -27,15 +27,21 @@ export default function TermsPage() {
       <P><strong>Recipient data:</strong> when you include another person&rsquo;s name, photos, likeness, or other information, you confirm you have the right to do so and, where required, their consent. You are responsible for that content.</P>
       <P>We may remove content or suspend accounts that violate these Terms. To report abuse or an infringement, contact {LEGAL.contactEmail}.</P>
 
-      <H2>Payments, plans and &ldquo;lifetime&rdquo;</H2>
+      <H2>Payments and how long a gift lasts</H2>
       <UL>
-        <LI>Prices and available plans (e.g. monthly, annual, or one-time / &ldquo;lifetime&rdquo;) are shown at checkout. Payments are processed by our payment provider.</LI>
-        <LI>Recurring plans renew automatically until cancelled; you can cancel anytime before renewal, effective at the end of the current period.</LI>
-        <LI>&ldquo;Lifetime&rdquo; means for the operational lifetime of the Service, not a guarantee of perpetual availability. Reasonable fair-use and media-storage limits apply.</LI>
+        <LI>A gift is a <strong>single payment</strong> that keeps it live for <strong>one year</strong> from the date of purchase. The price is shown at checkout and includes any tax we are required to collect.</LI>
+        <LI><strong>There is no automatic renewal.</strong> We will never charge you again without you choosing to buy. Nothing to cancel.</LI>
+        <LI>When the year ends, the private gift link stops working. Everything you created stays in your account, and buying another year brings the same link back to life.</LI>
+        <LI>You can build and edit a gift for free. Payment is what makes the private link work.</LI>
+        <LI>Reasonable fair-use and media-storage limits apply. Payments are processed by our payment provider, Stripe.</LI>
       </UL>
 
       <H2>Refunds &amp; right of withdrawal</H2>
-      <P>Where you are an EU/UK consumer, you may have a 14-day right of withdrawal for digital services. By starting to use the Service immediately (creating/publishing your gift) you may be asked to acknowledge that provision begins at once and that the withdrawal right is lost once fully performed. Beyond statutory rights, our refund practice is described at checkout.</P>
+      <P>If you are an EU/UK consumer, you normally have a <strong>14-day right of withdrawal</strong> for digital services bought at a distance.</P>
+      <P>Because a gift becomes usable the moment you pay, we ask you at checkout to expressly request that we begin immediately and to acknowledge that <strong>you lose the 14-day right of withdrawal once the gift link goes live</strong>. You give that consent by ticking the box at checkout; if you would rather keep the full 14 days, do not complete the purchase.</P>
+      <P>After that point, we refund where <strong>something is wrong on our side</strong> — the gift or the Service does not work as described and we cannot put it right for you in reasonable time. Contact {LEGAL.contactEmail} and tell us what went wrong; we would always rather fix it than lose you.</P>
+      <P>If we refund a purchase, the year it paid for ends immediately: the private gift link is permanently deleted, any uploaded video or music stops being reachable, and notifications to the recipient stop. Your account and everything you wrote are kept. If you buy again afterwards we issue a <strong>new</strong> link — the refunded one never works again.</P>
+      <P>None of this limits rights you have by law that cannot be limited, including for services that are faulty, not as described, or not supplied.</P>
 
       <H2>Availability &amp; disclaimer</H2>
       <P>The Service is provided &ldquo;as is&rdquo; and &ldquo;as available&rdquo;. We do not warrant uninterrupted or error-free operation. To the maximum extent permitted by law, we disclaim implied warranties.</P>

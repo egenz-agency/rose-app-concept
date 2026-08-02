@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
 import { getAccessibleTenant, readGiftCookie } from "@/lib/security/giftAccess"
+import { signMedia } from "@/lib/server/media"
 import { ExperiencePage } from "@/app/experience/ExperiencePage"
 
 // Private gift — never index or follow.
@@ -36,14 +37,22 @@ export default async function GiftPage({
   if (!tenant) redirect("/gift-unavailable")
 
   const c = tenant.customization ?? {}
+  // The media bucket is private: mint short-lived signed URLs here, AFTER the
+  // access + entitlement gates above have passed. A revoked gift therefore never
+  // hands out a playable link.
+  const [introVideoUrl, songUrl] = await Promise.all([
+    signMedia(c.introVideoUrl),
+    signMedia(c.songUrl),
+  ])
+
   return (
     <ExperiencePage
       slug={slug}
       config={{
         recipientName: tenant.recipient_name,
         giverName: tenant.giver_name,
-        introVideoUrl: c.introVideoUrl ?? null,
-        songUrl: c.songUrl ?? null,
+        introVideoUrl,
+        songUrl,
       }}
     />
   )

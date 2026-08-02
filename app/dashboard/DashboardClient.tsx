@@ -7,22 +7,27 @@ import {
   updateNamesAction, uploadMediaAction, clearMediaAction, deleteAccountAction,
 } from "./actions"
 import { MissYouOwner } from "./MissYouOwner"
+import { GiftStatus } from "./GiftStatus"
+import { isGiftLive } from "@/lib/payments/entitlement"
+import { LEGAL } from "@/components/legal/LegalLayout"
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>
 
-export function DashboardClient({
-  tenant, messages, moments, email,
-}: { tenant: Row; messages: Row[]; moments: Row[]; email: string }) {
-  const router = useRouter()
-  // Private capability link: carries the secret token, not the guessable slug.
-  const giftPath = `/g/${tenant.access_token}`
-  const [copied, setCopied] = useState(false)
+export interface SignedMedia {
+  introVideoUrl: string | null
+  songUrl: string | null
+}
 
-  const copyLink = () => {
-    navigator.clipboard?.writeText(`${window.location.origin}${giftPath}`)
-    setCopied(true); setTimeout(() => setCopied(false), 1500)
-  }
+export function DashboardClient({
+  tenant, messages, moments, email, media,
+}: { tenant: Row; messages: Row[]; moments: Row[]; email: string; media: SignedMedia }) {
+  const router = useRouter()
+  const isLive = isGiftLive({
+    status: String(tenant.status ?? "draft"),
+    paid: Boolean(tenant.paid),
+    expires_at: (tenant.expires_at as string | null) ?? null,
+  })
   const refresh = () => router.refresh()
 
   return (
@@ -41,25 +46,16 @@ export function DashboardClient({
           {tenant.recipient_name ? `For ${tenant.recipient_name}` : "Your gift"}
         </h1>
 
-        {/* Gift link */}
-        <div style={card}>
-          <div style={sectionLabel}>The gift link to send her</div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <code style={{ fontSize: 14, color: "#e8c882", wordBreak: "break-all" }}>{giftPath}</code>
-            <button onClick={copyLink} style={smallBtn}>{copied ? "Copied!" : "Copy"}</button>
-            <a href={giftPath} target="_blank" rel="noreferrer" style={{ ...smallBtn, textDecoration: "none" }}>Open</a>
-          </div>
-          <p style={{ margin: "10px 0 0", fontSize: 12, lineHeight: 1.5, color: "rgba(242,236,224,0.45)", fontFamily: "'EB Garamond', serif" }}>
-            This is a private link — only the person you send it to can open the gift. Keep it just between you two. On her phone she can add it to her home screen to install it like an app.
-          </p>
-        </div>
+        {/* Gift link — or the paywall in front of it while unpaid/expired */}
+        <GiftStatus tenant={tenant} />
 
-        {/* "I miss you" — reach her from here, no need to open her gift link */}
-        <MissYouOwner recipientName={(tenant.recipient_name as string | null) ?? null} />
+        {/* "I miss you" — reach her from here, no need to open her gift link.
+            Pointless before the gift is live: she has no device registered yet. */}
+        {isLive && <MissYouOwner recipientName={(tenant.recipient_name as string | null) ?? null} />}
 
         {/* Customize */}
         <Section title="Customize">
-          <Customize tenant={tenant} onDone={refresh} />
+          <Customize tenant={tenant} media={media} onDone={refresh} />
         </Section>
 
         {/* Scheduled messages */}
@@ -97,7 +93,7 @@ export function DashboardClient({
           <a href="/legal/privacy" style={footLink}>Privacy</a>
           <a href="/legal/terms" style={footLink}>Terms</a>
           <a href="/legal/cookies" style={footLink}>Cookies</a>
-          <a href="mailto:support@example.com" style={footLink}>Contact</a>
+          <a href={`mailto:${LEGAL.contactEmail}`} style={footLink}>Contact</a>
         </footer>
       </div>
     </div>
@@ -149,8 +145,7 @@ function momentWhen(m: Row): string {
   return "next visit"
 }
 
-function Customize({ tenant, onDone }: { tenant: Row; onDone: () => void }) {
-  const c = (tenant.customization ?? {}) as Record<string, string>
+function Customize({ tenant, media, onDone }: { tenant: Row; media: SignedMedia; onDone: () => void }) {
   const [recipient, setRecipient] = useState(tenant.recipient_name ?? "")
   const [giver, setGiver] = useState(tenant.giver_name ?? "")
   const [busy, setBusy] = useState(false)
@@ -171,8 +166,8 @@ function Customize({ tenant, onDone }: { tenant: Row; onDone: () => void }) {
         <button type="submit" disabled={busy} style={addBtn(busy)}>{busy ? "Saving…" : "Save names"}</button>
       </form>
 
-      <MediaUpload kind="intro" label="Intro video" accept="video/*" current={c.introVideoUrl} onDone={onDone} />
-      <MediaUpload kind="song" label="Background song" accept="audio/*" current={c.songUrl} onDone={onDone} />
+      <MediaUpload kind="intro" label="Intro video" accept="video/*" current={media.introVideoUrl ?? undefined} onDone={onDone} />
+      <MediaUpload kind="song" label="Background song" accept="audio/*" current={media.songUrl ?? undefined} onDone={onDone} />
     </>
   )
 }

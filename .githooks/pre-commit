@@ -1,0 +1,39 @@
+#!/bin/sh
+# Block Stripe (and Supabase service-role) secrets from ever entering a commit.
+# Key exposure in a repo is the leading cause of API-key takeover.
+#
+# Enable with:  git config core.hooksPath .githooks
+# Bypass once:  git commit --no-verify
+
+added=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$added" ] && exit 0
+
+# sk_live/rk_live are always fatal; sk_test/rk_test are warned about too, since
+# a test key in git is a habit that eventually commits a live one.
+if git diff --cached -U0 -- $added | grep -nE '^\+.*\b[sr]k_(live|test)_[A-Za-z0-9]{8,}' >/dev/null 2>&1; then
+  echo "✖ Commit blocked: a Stripe API key looks like it's in the staged diff."
+  echo ""
+  git diff --cached -U0 -- $added | grep -nE '^\+.*\b[sr]k_(live|test)_[A-Za-z0-9]{8,}' | sed 's/^/    /'
+  echo ""
+  echo "  Move it to an environment variable / secrets vault."
+  echo "  If a LIVE key was exposed, roll it now: https://dashboard.stripe.com/apikeys"
+  exit 1
+fi
+
+# Stripe webhook signing secrets are secrets too.
+if git diff --cached -U0 -- $added | grep -nE '^\+.*\bwhsec_[A-Za-z0-9]{16,}' >/dev/null 2>&1; then
+  echo "✖ Commit blocked: a Stripe webhook signing secret (whsec_…) is in the staged diff."
+  exit 1
+fi
+
+# Supabase secret keys bypass RLS entirely. Match the KEY FORMAT, not the word
+# "service_role" — that's a normal Postgres role name that appears all over SQL,
+# policies and docs, so matching it blocks honest commits and trains you to reach
+# for --no-verify, which is worse than having no hook at all.
+if git diff --cached -U0 -- $added | grep -nE '^\+.*\bsb_secret_[A-Za-z0-9]{8,}' >/dev/null 2>&1; then
+  echo "✖ Commit blocked: a Supabase secret key (sb_secret_…) is in the staged diff."
+  echo "  It bypasses RLS entirely — move it to the environment and rotate it."
+  exit 1
+fi
+
+exit 0

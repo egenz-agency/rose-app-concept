@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getTenantByToken } from "@/lib/server/tenantQueries"
 import { giftCookieName, GIFT_COOKIE_MAX_AGE } from "@/lib/security/giftAccess"
+import { isGiftLive } from "@/lib/payments/entitlement"
 
 // Private gift entry point. The share link is /g/<access_token>. We validate the
 // token, drop an httpOnly cookie that grants access to this one gift, then
@@ -20,8 +21,10 @@ export async function GET(
     return NextResponse.redirect(`${origin}/gift-unavailable`)
   }
 
+  // A correct token is not enough: the gift must also be paid for and inside its
+  // year. Unpaid drafts and lapsed gifts look exactly like a bad token here.
   const tenant = await getTenantByToken(clean)
-  if (!tenant || tenant.status === "suspended") {
+  if (!tenant || !isGiftLive(tenant)) {
     return NextResponse.redirect(`${origin}/gift-unavailable`)
   }
 

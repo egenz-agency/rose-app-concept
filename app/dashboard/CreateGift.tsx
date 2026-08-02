@@ -3,8 +3,9 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createGiftAction } from "./actions"
 
-// Shown when a logged-in buyer has no gift yet. Until Stripe checkout exists
-// (Phase 5), this is the onboarding step: pick a link name + names.
+// Shown when a logged-in buyer has no gift yet: pick a link name + names. The
+// gift is created as an unpaid draft — they build it for free and pay from the
+// dashboard when they're ready to send the link (see GiftStatus).
 export function CreateGift({ email }: { email: string }) {
   const router = useRouter()
   const [slug, setSlug] = useState("")

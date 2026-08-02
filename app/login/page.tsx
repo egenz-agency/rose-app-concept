@@ -35,6 +35,18 @@ export default function LoginPage() {
     setMode(next); setError(null); setMsg(null)
   }
 
+  // Deliberately non-committal, and deliberately IDENTICAL for both outcomes —
+  // a brand-new address and one that's already taken produce exactly this text.
+  // That's what stops the signup form being used to discover which emails have
+  // accounts. If you ever split these two messages apart, the leak comes back.
+  // Either way the user lands in sign-in with their email still filled in.
+  function setSignupAmbiguous() {
+    setMsg(
+      "If that email is new, check your inbox to confirm it. If you already have an account, sign in instead."
+    )
+    setMode("signin")
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setError(null); setMsg(null)
@@ -59,10 +71,23 @@ export default function LoginPage() {
       if (mode === "signup") {
         const { data, error } = await sb.auth.signUp({ email: email.trim(), password })
         if (error) throw error
+
+        // Signing up with an address that already has an account does NOT error:
+        // Supabase returns 200 with an obfuscated user so the form can't be used
+        // to enumerate accounts. The tell is an empty `identities` array — a
+        // genuinely new signup always comes back with one. (With email
+        // confirmation switched off it throws "User already registered" instead,
+        // which is caught below.) Without this check the user is told to go
+        // check an inbox that will never receive anything.
+        if (data.user && (data.user.identities?.length ?? 0) === 0) {
+          setSignupAmbiguous()
+          return
+        }
+
         if (data.session) { router.push("/dashboard"); router.refresh(); return }
-        // Email confirmation is on → no session yet.
-        setMsg("Account created! Check your email to confirm, then come back and sign in.")
-        setMode("signin")
+        // Email confirmation is on → no session yet. Same message as the
+        // already-taken branch above, on purpose.
+        setSignupAmbiguous()
         return
       }
 
@@ -75,6 +100,12 @@ export default function LoginPage() {
       setMsg("Check your email for a magic link 🌹")
     } catch (err: unknown) {
       const raw = err instanceof Error ? err.message : String(err)
+      // The other shape of "this email is taken" — thrown when email
+      // confirmation is disabled, instead of the obfuscated user above.
+      if (/already registered|already exists|user_already_exists/i.test(raw)) {
+        setSignupAmbiguous()
+        return
+      }
       // Make the most common signin error actionable.
       setError(
         /invalid login credentials/i.test(raw)

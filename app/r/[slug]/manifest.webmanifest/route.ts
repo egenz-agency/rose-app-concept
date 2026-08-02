@@ -1,5 +1,6 @@
 import { getTenantBySlug } from "@/lib/server/tenantQueries"
 import { tokensMatch } from "@/lib/security/giftAccess"
+import { isGiftLive } from "@/lib/payments/entitlement"
 
 // Per-gift PWA manifest. Requires the gift's token (?k=) so it can't be scraped
 // for the secret, and so the installed app is branded + scoped to THIS gift:
@@ -17,7 +18,7 @@ export async function GET(
   if (!/^[a-z0-9-]{1,64}$/.test(slug)) return notFound()
 
   const tenant = await getTenantBySlug(slug)
-  if (!tenant || tenant.status === "suspended" || !tokensMatch(k, tenant.access_token)) {
+  if (!tenant || !isGiftLive(tenant) || !tokensMatch(k, tenant.access_token)) {
     return notFound()
   }
 

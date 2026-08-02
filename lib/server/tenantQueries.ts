@@ -47,6 +47,9 @@ export interface TenantRecord {
   id: string
   slug: string
   status: string
+  // Entitlement: bought once, live for a year (see lib/payments/entitlement.ts).
+  paid: boolean
+  expires_at: string | null
   recipient_name: string | null
   giver_name: string | null
   access_token: string
@@ -54,7 +57,8 @@ export interface TenantRecord {
   customization: Record<string, any>
 }
 
-const TENANT_COLS = "id, slug, status, recipient_name, giver_name, access_token, customization"
+const TENANT_COLS =
+  "id, slug, status, paid, expires_at, recipient_name, giver_name, access_token, customization"
 
 export async function getTenantBySlug(slug: string): Promise<TenantRecord | null> {
   const sb = getAdminClient()

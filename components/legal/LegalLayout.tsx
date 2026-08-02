@@ -4,16 +4,18 @@ import Link from "next/link"
 // Shared shell for the legal pages. Inline styles (the project's Tailwind
 // padding utilities are globally zeroed — see reference note).
 
-// ── Fill these in with your real details before going live ───────────────────
+// Trader identity. EU consumer law requires a trader to be identifiable, and
+// GDPR requires the data controller to be named — so these are published on the
+// legal pages and must stay accurate.
 export const LEGAL = {
   serviceName: "Stella's Rose",
-  operator: "[Your legal name or company]",
-  address: "[Your registered address]",
-  country: "[Country]",
-  contactEmail: "support@your-domain.com",
-  privacyEmail: "privacy@your-domain.com",
-  website: "your-domain.com",
-  lastUpdated: "28 June 2026",
+  operator: "Iliyan Tachev",
+  address: "zhk. Levski V, bl. 26, Sofia, Bulgaria",
+  country: "Bulgaria",
+  contactEmail: "killiyan22@gmail.com",
+  privacyEmail: "killiyan22@gmail.com",
+  website: "rose-app-multitenant.vercel.app",
+  lastUpdated: "1 August 2026",
 }
 
 export function LegalLayout({ title, children }: { title: string; children: ReactNode }) {

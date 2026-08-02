@@ -4,6 +4,47 @@ A deeply personal, single-user romantic web experience. A boyfriend built this a
 
 ---
 
+## What's new — August 2026 (multi-tenant branch)
+
+The gift became a **product you can sell**. Previously anyone who signed up got a fully
+working gift for free; there was no payment, no entitlement, and no way to take money.
+
+**Payments (Stripe).** A gift is bought once and stays live for **one year** — a one-time
+payment, no auto-renewing subscription. The owner builds the gift for free and pays only to
+make the private link work; when the year lapses they buy another and the same link returns.
+Checkout → webhook → entitlement → invoice is wired end to end and verified with a real
+test purchase. See *Payments* below.
+
+**Entitlement gating.** `lib/payments/entitlement.ts` is the single definition of "is this
+gift live", used by every gate — the share link, the gift page, all its server actions, the
+PWA manifest, and the dashboard. An unpaid draft or lapsed gift is indistinguishable from
+one that never existed, so a recipient is never shown a paywall meant for the buyer.
+
+**Refunds revoke everything.** A full refund destroys the share link (rotates
+`access_token`), drops the recipient's devices, and cuts off media. Stacked years are handled
+correctly; partial refunds deliberately don't revoke.
+
+**Media is private.** `tenant-media` moved from a public bucket to signed URLs minted
+server-side after the gates. A public URL outlived expiry, refund and deletion — meaning the
+most personal content in the gift was never actually revocable.
+
+**Legal + identity.** Real trader identity published (EU consumer law + GDPR controller),
+terms rewritten to describe the actual one-year model instead of the subscription language
+that was there before, and a refund clause backed by a consent step at checkout.
+
+**Fixes along the way.** Signup no longer tells you to check an inbox that will never receive
+anything (while still not leaking which emails have accounts); the service worker no longer
+caches dev chunks into a reload loop; `.githooks/pre-commit` blocks Stripe keys from being
+committed.
+
+**Known gaps.** One account still manages only **one gift** (every dashboard query takes the
+oldest), so repeat purchases and self-testing need a second account. `STRIPE_AUTOMATIC_TAX`
+is off pending VAT registration. Custom SMTP is not configured, so Supabase's default sender
+won't reach real customers. The legacy single-tenant path (`/rosesecret`, the `roseApi`
+fallback) is dead code that should be deleted.
+
+---
+
 ## Vision
 
 She opens the site. A video plays. Then the rose appears — dead center, under a glass dome, floating in darkness. Stars orbit it slowly, each one a memory they made together. She presses and holds to tend the rose. It spins, blooms, unfurls. If she misses a day, a petal falls.
@@ -681,6 +722,116 @@ Banned words: modern, clean, minimal, premium, professional, elegant, beautiful.
 
 ---
 
+## Payments (multi-tenant / rose-saas only)
+
+A gift is **bought once and stays live for one year**. There is no auto-renewing
+subscription — when the year lapses the owner buys another year, and the same
+link comes back to life.
+
+### What is gated, and what is not
+The owner **builds their gift for free**. Only the things that actually *reach the
+recipient* are gated, so a lapsed gift never holds the owner's own writing hostage:
+
+| Gated | Free |
+|---|---|
+| The share link `/g/<token>` and the gift page `/r/<slug>` | Creating the gift, messages, moments, names, uploads |
+| The per-gift PWA manifest (an installed app also goes dark) | The whole dashboard |
+| "I miss you" pushes to her phone | — |
+
+### Entitlement
+`lib/payments/entitlement.ts` holds the **single definition** of live, shared by the
+gates and the dashboard so they can't drift: `status = 'active' AND paid AND expires_at > now()`.
+Lifecycle is `draft → live → expired` (plus `suspended`).
+
+New gifts are created by `create_my_tenant()` as **`draft`** — unpaid, link dead.
+
+### Trust model
+- Payment is granted **only** by the Stripe webhook, after signature verification over the
+  raw body. The browser's `?paid=1` success redirect grants nothing — anyone can visit it.
+- The webhook trusts only `metadata.tenant_id`, set server-side at checkout from the buyer's
+  own RLS-scoped session — so a checkout can never credit someone else's gift.
+- `record_gift_payment()` is **idempotent on the Stripe session id**, so Stripe's retries
+  grant exactly one year. Renewals **stack on the remaining time**; a lapsed gift restarts today.
+- `gift_payments` has **RLS on with no policy** — only the service-role webhook can read or
+  write it (same pattern as `app_config` / `push_subscriptions` / `rate_limits`).
+- `record_gift_payment()` has `EXECUTE` **revoked** from `anon` and `authenticated`.
+- A draft or expired gift is **indistinguishable from one that never existed** to the
+  recipient — she is never shown a paywall meant for the buyer.
+
+### Pieces
+| Piece | File |
+|---|---|
+| Entitlement rule (shared, no server-only imports) | `lib/payments/entitlement.ts` |
+| Stripe client + env accessors | `lib/payments/stripe.ts` (`server-only`) |
+| Checkout (buy / renew) | `app/dashboard/checkout.ts` |
+| Webhook — the only place a gift becomes paid | `app/api/stripe/webhook/route.ts` |
+| Paywall + link + renewal UI | `app/dashboard/GiftStatus.tsx` |
+| Gates | `lib/security/giftAccess.ts`, `app/g/[token]/route.ts`, `app/r/[slug]/manifest.webmanifest/route.ts` |
+| Tables / functions | `tenants.paid`, `tenants.expires_at`, `gift_payments`, `record_gift_payment()` |
+
+### Invoicing + customers
+Every buyer gets a **persistent Stripe Customer** (`tenants.stripe_customer_id`), not the
+throwaway guest that `customer_email` creates per session — a guest can't be invoiced or
+looked up later. `invoice_creation` is on, and the invoice id is stored on the ledger row
+(`gift_payments.stripe_invoice_id`) so support can resend a receipt without digging through
+the Dashboard.
+
+### Tax (VAT/GST) — read before trusting it
+`automatic_tax: { enabled: true }` is set on the Checkout Session, **but Stripe collects
+nothing until an active tax registration exists** in the buyer's jurisdiction — and it
+returns *no error* when there isn't one. Enabling the flag is not the same as being
+compliant. Two more prerequisites:
+
+- The **Product** needs a product tax code (set in the Dashboard; never hardcode a `txcd_`).
+- The **Price** needs a `tax_behavior` (inclusive vs exclusive). EU B2C usually shows
+  tax-inclusive prices.
+
+Because a saved Customer is used, `billing_address_collection: 'required'` +
+`customer_update: { address: 'auto' }` are both set — without them Checkout keeps reusing the
+customer's stale saved address and taxes the wrong place.
+
+### Refunds revoke everything
+A full refund (`charge.refunded`) calls `revoke_gift_payment()`, which:
+
+1. Recomputes `expires_at` from the payments that remain un-refunded — so refunding
+   one of two stacked years leaves the other intact.
+2. If no paid time survives: **rotates `access_token`**, permanently killing the shared
+   link, and deletes the recipient's `push_subscriptions`.
+3. Media stops resolving, because signed URLs are only minted after the entitlement gate.
+
+A **partial** refund deliberately does *not* revoke — that's the goodwill case where you
+part-refund someone for a problem but leave their gift running.
+
+Expiry and refund differ on purpose: an expired year restores **the same link** on renewal;
+a refunded one issues a **new** link, so a forwarded copy is dead forever.
+
+Manual kill switch, independent of payment:
+```sql
+update tenants set status = 'suspended' where slug = '…';  -- beats every other state
+```
+
+### Media is private
+`tenant-media` is a **private** bucket. `customization.introVideoUrl` / `songUrl` store the
+storage **path**, and `lib/server/media.ts` mints a 6-hour signed URL at render time — in
+`/r/[slug]` and the dashboard, both *after* the gates. A public bucket was the hole here: a
+public URL outlives expiry, refund, and deletion, so "revoke their access" silently excluded
+the video and the song. Verified: public URL → 400, signed → 200, tampered token → 400.
+
+### Stripe conventions this integration follows
+- **Never** pass `payment_method_types` — it would disable dynamic payment methods and lock
+  buyers to cards, hurting conversion.
+- `integration_identifier` tags sessions for Dashboard funnel comparison. It is **stable**;
+  don't regenerate the suffix per session or the sessions stop grouping.
+- Prefer a **restricted key** (`rk_`) over `sk_`; on Vercel store it as a *sensitive* env var.
+- `.githooks/pre-commit` blocks Stripe keys / `whsec_` / `service_role` from being committed
+  (`git config core.hooksPath .githooks`).
+
+### Environment
+`STRIPE_SECRET_KEY` (prefer `rk_`), `STRIPE_PRICE_ID` (a **one-time** price, not recurring),
+`STRIPE_WEBHOOK_SECRET`. Unset → checkout throws a clear error rather than falling back.
+
+---
+
 ## Development Commands
 
 ```bash
@@ -700,4 +851,5 @@ npm run build
 
 ---
 
-*Last updated: June 2026. All features implemented and verified.*
+*Last updated: 1 August 2026 — payments, entitlement gating, refund revocation and private
+media added on the `multi-tenant` branch. See "What's new" at the top.*

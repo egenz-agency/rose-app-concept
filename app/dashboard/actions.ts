@@ -7,6 +7,7 @@ import {
   cleanSlug, cleanText, cleanDate, cleanHttpUrl, cleanInt, validateUpload, LIMITS,
 } from "@/lib/security/validate"
 import { enforceRateLimit } from "@/lib/security/ratelimit"
+import { isGiftLive } from "@/lib/payments/entitlement"
 import {
   getVapidPublicKey,
   registerPushSubscription,
@@ -30,6 +31,25 @@ async function requireMyTenantId(): Promise<string> {
   const sb = await getSaasServerClient()
   const { data } = await sb.from("tenants").select("id").order("created_at", { ascending: true }).limit(1).single()
   if (!data) throw new Error("No gift yet")
+  return data.id as string
+}
+
+// Same, but also requires the gift to be paid for and inside its year. Building
+// a gift is free — only the things that actually REACH the recipient (her link,
+// and pushes to her phone) are gated, so the owner never loses their own work.
+async function requireLiveTenantId(): Promise<string> {
+  await requireUserId()
+  const sb = await getSaasServerClient()
+  const { data } = await sb
+    .from("tenants")
+    .select("id, status, paid, expires_at")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .single()
+  if (!data) throw new Error("No gift yet")
+  if (!isGiftLive(data as { status: string; paid: boolean; expires_at: string | null })) {
+    throw new Error("This gift isn't active — unlock it from your dashboard first.")
+  }
   return data.id as string
 }
 
@@ -134,7 +154,11 @@ export async function updateNamesAction(input: { recipient: string; giver: strin
 }
 
 // Upload an intro video or song. Size + mime + extension are strictly validated
-// (public bucket → never accept executable/HTML/SVG content, and cap cost).
+// (never accept executable/HTML/SVG content, and cap cost).
+//
+// We store the storage PATH, not a URL. The bucket is private, so every viewer
+// gets a short-lived signed URL minted at render time — which is what makes
+// "revoke their access" also cover the video and the song.
 export async function uploadMediaAction(formData: FormData) {
   const tenantId = await requireMyTenantId()
   await enforceRateLimit(`upload:${tenantId}`, 20, 3600) // 20/hour per gift
@@ -148,12 +172,11 @@ export async function uploadMediaAction(formData: FormData) {
     cacheControl: "31536000", upsert: false, contentType: file!.type || undefined,
   })
   if (upErr) throw new Error(upErr.message)
-  const url = admin.storage.from("tenant-media").getPublicUrl(path).data.publicUrl
 
   const sb = await getSaasServerClient()
   const { data: t } = await sb.from("tenants").select("customization").eq("id", tenantId).single()
   const key = kind === "intro" ? "introVideoUrl" : "songUrl"
-  const customization = { ...((t?.customization as Record<string, unknown>) ?? {}), [key]: url }
+  const customization = { ...((t?.customization as Record<string, unknown>) ?? {}), [key]: path }
   const { error } = await sb.from("tenants").update({ customization }).eq("id", tenantId)
   if (error) throw new Error(error.message)
   revalidatePath("/dashboard")
@@ -205,7 +228,7 @@ export async function deleteAccountAction() {
 
 // The public VAPID key + who they'd be reaching. Safe to expose to the browser.
 export async function getOwnerMissYouConfigAction() {
-  const tenantId = await requireMyTenantId()
+  const tenantId = await requireLiveTenantId()
   const sb = await getSaasServerClient()
   const { data } = await sb.from("tenants").select("recipient_name").eq("id", tenantId).single()
   return {
@@ -219,7 +242,7 @@ export async function registerOwnerDeviceAction(subscription: {
   p256dh?: unknown
   auth?: unknown
 }) {
-  const tenantId = await requireMyTenantId()
+  const tenantId = await requireLiveTenantId()
   await enforceRateLimit(`push-reg-owner:${tenantId}`, 20, 3600) // 20/hour per gift
 
   const endpoint = cleanHttpUrl(subscription?.endpoint)
@@ -232,7 +255,7 @@ export async function registerOwnerDeviceAction(subscription: {
 }
 
 export async function sendOwnerMissYouAction(count: unknown) {
-  const tenantId = await requireMyTenantId()
+  const tenantId = await requireLiveTenantId()
   await enforceRateLimit(`miss-you-owner:${tenantId}`, 30, 3600) // 30/hour per gift
 
   const sb = await getSaasServerClient()
