@@ -14,7 +14,7 @@ export function GiftStatus({ tenant }: { tenant: Record<string, unknown> }) {
   const entitlement = {
     status: String(tenant.status ?? "draft"),
     paid: Boolean(tenant.paid),
-    expires_at: (tenant.expires_at as string | null) ?? null,
+    expires_at: (tenant.expires_at as string | null) ?? null
   }
   const phase = giftLifecycle(entitlement)
   const giftPath = `/g/${tenant.access_token}`
@@ -134,23 +134,20 @@ function formatDate(iso: string | null): string {
 
 const card: React.CSSProperties = {
   border: "1px solid rgba(184,148,74,0.18)", borderRadius: 14, padding: 16,
-  marginTop: 10, background: "rgba(255,255,255,0.02)",
+  marginTop: 10, background: "rgba(255,255,255,0.02)"
 }
 const sectionLabel: React.CSSProperties = {
   fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase",
-  color: "rgba(232,200,130,0.7)", marginBottom: 8,
+  color: "rgba(232,200,130,0.7)", marginBottom: 8
 }
 const body: React.CSSProperties = {
-  fontSize: 12, lineHeight: 1.5, color: "rgba(242,236,224,0.45)", fontFamily: "'EB Garamond', serif",
-}
+  fontSize: 12, lineHeight: 1.5, color: "rgba(242,236,224,0.45)" }
 const smallBtn: React.CSSProperties = {
   padding: "6px 12px", borderRadius: 999, border: "1px solid rgba(184,148,74,0.3)",
   background: "rgba(255,255,255,0.05)", color: "#f2ece0", fontSize: 12,
-  cursor: "pointer", fontFamily: "'EB Garamond', serif",
-}
+  cursor: "pointer" }
 const payBtn = (busy: boolean): React.CSSProperties => ({
   marginTop: 14, padding: "10px 18px", borderRadius: 999,
   border: "1px solid rgba(232,200,130,0.5)", background: "rgba(232,200,130,0.14)",
-  color: "#f6eeda", fontSize: 14, fontFamily: "'EB Garamond', serif",
-  cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1,
+  color: "#f6eeda", fontSize: 14, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1
 })

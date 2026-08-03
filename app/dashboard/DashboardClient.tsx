@@ -4,13 +4,16 @@ import { useRouter } from "next/navigation"
 import {
   addMessageAction, deleteMessageAction,
   addMomentAction, deleteMomentAction, signOutAction,
-  updateNamesAction, uploadMediaAction, clearMediaAction, deleteAccountAction,
+  updateNamesAction, uploadMediaAction, clearMediaAction, deleteAccountAction
 } from "./actions"
 import { MissYouOwner } from "./MissYouOwner"
 import { GiftStatus } from "./GiftStatus"
 import { isGiftLive } from "@/lib/payments/entitlement"
 import { LEGAL } from "@/components/legal/LegalLayout"
 import { InstallAppButton } from "@/components/ui/InstallAppButton"
+import { SupportLinks } from "@/components/ui/SupportLinks"
+import { DashboardTour, ReopenTourButton } from "./DashboardTour"
+import { FilmIcon, MusicIcon, UploadIcon, CheckIcon, TrashIcon } from "@/components/ui/Icons"
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>
@@ -21,27 +24,30 @@ export interface SignedMedia {
 }
 
 export function DashboardClient({
-  tenant, messages, moments, email, media, isOperator = false,
+  tenant, messages, moments, email, media, isOperator = false, tourSeen = true
 }: {
   tenant: Row; messages: Row[]; moments: Row[]; email: string
-  media: SignedMedia; isOperator?: boolean
+  media: SignedMedia; isOperator?: boolean; tourSeen?: boolean
 }) {
   const router = useRouter()
   const isLive = isGiftLive({
     status: String(tenant.status ?? "draft"),
     paid: Boolean(tenant.paid),
-    expires_at: (tenant.expires_at as string | null) ?? null,
+    expires_at: (tenant.expires_at as string | null) ?? null
   })
   const refresh = () => router.refresh()
 
   return (
-    <div style={{ height: "100dvh", overflowY: "auto", WebkitOverflowScrolling: "touch", background: "#0a0205", padding: "32px 20px 80px", color: "#f2ece0" }}>
+    <div className="ui-surface" style={{ height: "100dvh", overflowY: "auto", WebkitOverflowScrolling: "touch", background: "#0a0205", padding: "32px 20px 80px", color: "#f2ece0" }}>
+      {/* Runs once, on the first visit after signing up. */}
+      <DashboardTour open={!tourSeen} />
+
       <div style={{ maxWidth: 640, margin: "0 auto" }}>
 
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
           <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ color: "rgba(242,236,224,0.45)", fontSize: 12, fontFamily: "'EB Garamond', serif" }}>{email}</span>
+            <span style={{ color: "rgba(242,236,224,0.45)", fontSize: 12 }}>{email}</span>
             {isOperator && (
               <a href="/admin" style={{ ...ghostBtn, textDecoration: "none", borderColor: "rgba(232,200,130,0.4)", color: "#e8c882" }}>
                 Operator
@@ -53,7 +59,7 @@ export function DashboardClient({
           </form>
         </div>
 
-        <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 30, marginBottom: 4 }}>
+        <h1 style={{ fontSize: 30, marginBottom: 4 }}>
           {tenant.recipient_name ? `For ${tenant.recipient_name}` : "Your gift"}
         </h1>
 
@@ -107,12 +113,15 @@ export function DashboardClient({
           <DangerZone />
         </Section>
 
-        <footer style={{ marginTop: 36, paddingTop: 18, borderTop: "1px solid rgba(184,148,74,0.12)", display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, fontFamily: "'EB Garamond', serif" }}>
+        <footer style={{ marginTop: 36, paddingTop: 18, borderTop: "1px solid rgba(184,148,74,0.12)", display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12 }}>
           <a href="/legal/privacy" style={footLink}>Privacy</a>
           <a href="/legal/terms" style={footLink}>Terms</a>
           <a href="/legal/cookies" style={footLink}>Cookies</a>
           <a href={`mailto:${LEGAL.contactEmail}`} style={footLink}>Contact</a>
+          <ReopenTourButton />
         </footer>
+
+        <SupportLinks context="owner dashboard" style={{ marginTop: 22 }} />
       </div>
     </div>
   )
@@ -126,7 +135,7 @@ function DangerZone() {
   return (
     <div style={{ ...card, borderColor: "rgba(200,60,60,0.28)" }}>
       <div style={sectionLabel}>Delete account &amp; all data</div>
-      <p style={{ fontSize: 13, color: "rgba(242,236,224,0.5)", fontFamily: "'EB Garamond', serif", marginBottom: 12 }}>
+      <p style={{ fontSize: 13, color: "rgba(242,236,224,0.5)", marginBottom: 12 }}>
         Permanently deletes your account, every gift you created, and all uploaded media. This cannot be undone.
       </p>
       {!confirming ? (
@@ -194,10 +203,15 @@ function MediaUpload({ kind, label, accept, current, onDone }: {
   kind: "intro" | "song"; label: string; accept: string; current?: string; onDone: () => void
 }) {
   const [busy, setBusy] = useState(false)
+  const [dragging, setDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const inputId = `media-${kind}`
 
-  async function upload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
+  // The native file input is visually hidden behind the label below. It can't
+  // be styled meaningfully and renders as a different application on every OS —
+  // but it stays in the DOM so keyboard and screen-reader users get the real
+  // control, and the label's htmlFor keeps them connected.
+  async function send(file: File | undefined) {
     if (!file) return
     setBusy(true); setError(null)
     try {
@@ -208,24 +222,85 @@ function MediaUpload({ kind, label, accept, current, onDone }: {
       onDone()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed")
-    } finally { setBusy(false) }
+    } finally { setBusy(false); setDragging(false) }
   }
 
+  const Icon = kind === "intro" ? FilmIcon : MusicIcon
+  const hint = kind === "intro"
+    ? "Plays once, the first time she opens the gift."
+    : "Plays quietly behind the rose."
+
   return (
-    <div style={formBox}>
-      <div style={sectionLabel}>{label}</div>
-      <div style={{ fontSize: 13, color: current ? "#9c7" : "rgba(242,236,224,0.4)", fontFamily: "'EB Garamond', serif" }}>
-        {busy ? "Uploading…" : current ? "✓ custom file set" : "using default"}
+    <div style={{ marginTop: 12 }}>
+      {/* Label above the control (never floating inside it) so the field is
+          still identifiable while it's focused or filled. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <Icon size={15} color="rgba(201,168,76,0.8)" />
+        <span style={sectionLabel}>{label}</span>
       </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <input type="file" accept={accept} onChange={upload} disabled={busy} style={{ fontSize: 12, color: "rgba(242,236,224,0.7)" }} />
-        {current && (
-          <button onClick={async () => { setBusy(true); try { await clearMediaAction(kind); onDone() } finally { setBusy(false) } }} disabled={busy} style={{ ...smallBtn, color: "#e58" }}>
-            Reset to default
-          </button>
-        )}
-      </div>
-      {error && <p style={{ color: "#e58", fontSize: 12 }}>{error}</p>}
+      <p style={{ margin: "0 0 10px", fontSize: 12, color: "var(--ivory-ghost)" }}>
+        {hint}
+      </p>
+
+      <label
+        htmlFor={inputId}
+        className="dropzone"
+        data-dragging={dragging}
+        onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => { e.preventDefault(); send(e.dataTransfer.files?.[0]) }}
+        style={{
+          display: "flex", alignItems: "center", gap: 12,
+          padding: "16px 18px", borderRadius: 14,
+          cursor: busy ? "default" : "pointer"
+        }}
+      >
+        <input
+          id={inputId} type="file" accept={accept} disabled={busy}
+          onChange={(e) => send(e.target.files?.[0])}
+          // Hidden from sight, not from assistive tech or the keyboard.
+          style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
+        />
+
+        <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: 10, background: "rgba(201,168,76,0.1)", border: "1px solid var(--border)", flexShrink: 0 }}>
+          {busy ? <UploadIcon size={16} color="rgba(201,168,76,0.9)" />
+                : current ? <CheckIcon size={16} color="#8fbf7a" />
+                : <UploadIcon size={16} color="rgba(201,168,76,0.7)" />}
+        </span>
+
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: "block", fontSize: 14, color: "var(--ivory)" }}>
+            {busy ? "Uploading…" : current ? "Your own file is set" : "Drop a file, or choose one"}
+          </span>
+          <span style={{ display: "block", fontSize: 11.5, color: "var(--ivory-ghost)", marginTop: 2 }}>
+            {busy ? "Keep this page open" : current ? "Tap to replace it" : `Using the default ${kind === "intro" ? "video" : "song"}`}
+          </span>
+        </span>
+      </label>
+
+      {/* Indeterminate: the server action returns no percentage, so a moving
+          sheen is honest where a progress bar would be inventing numbers. */}
+      {busy && (
+        <div style={{ position: "relative", overflow: "hidden", height: 2, borderRadius: 2, background: "var(--gold-dim)", marginTop: 8 }} className="sheen" />
+      )}
+
+      {current && !busy && (
+        <button
+          className="ctl"
+          onClick={async () => { setBusy(true); try { await clearMediaAction(kind); onDone() } finally { setBusy(false) } }}
+          style={{ ...smallBtn, marginTop: 10, display: "inline-flex", alignItems: "center", gap: 7, color: "rgba(242,236,224,0.6)" }}
+        >
+          <TrashIcon size={13} />
+          Remove, use the default
+        </button>
+      )}
+
+      {/* Error below the control, where forms conventionally put it. */}
+      {error && (
+        <p style={{ margin: "10px 0 0", fontSize: 12.5, color: "#e58" }}>
+          {error}
+        </p>
+      )}
     </div>
   )
 }
@@ -276,7 +351,7 @@ function AddMoment({ onDone }: { onDone: () => void }) {
             photo_url: photo || null, video_url: video || null,
             trigger_visit: kind === "visit" && visit ? parseInt(visit, 10) : null,
             trigger_date: kind === "date" ? date || null : null,
-            repeat_every: kind === "repeat" && repeat ? parseInt(repeat, 10) : null,
+            repeat_every: kind === "repeat" && repeat ? parseInt(repeat, 10) : null
           })
           setTitle(""); setMessage(""); setPhoto(""); setVideo(""); setVisit(""); setDate(""); setRepeat(""); onDone()
         } finally { setBusy(false) }
@@ -305,7 +380,7 @@ function AddMoment({ onDone }: { onDone: () => void }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ marginTop: 28 }}>
-      <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, marginBottom: 12, color: "rgba(242,236,224,0.9)" }}>{title}</h2>
+      <h2 style={{ fontSize: 20, marginBottom: 12, color: "rgba(242,236,224,0.9)" }}>{title}</h2>
       {children}
     </div>
   )
@@ -316,7 +391,7 @@ function RowItem({ title, subtitle, onDelete }: { title: string; subtitle: strin
   return (
     <div style={{ ...card, display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontFamily: "'EB Garamond', serif", whiteSpace: "pre-wrap" }}>{title}</div>
+        <div style={{ fontSize: 14, whiteSpace: "pre-wrap" }}>{title}</div>
         <div style={{ fontSize: 12, color: "rgba(242,236,224,0.45)", marginTop: 4 }}>{subtitle}</div>
       </div>
       <button onClick={async () => { setBusy(true); await onDelete() }} disabled={busy} style={{ ...smallBtn, color: "#e58", flexShrink: 0 }}>
@@ -327,12 +402,12 @@ function RowItem({ title, subtitle, onDelete }: { title: string; subtitle: strin
 }
 
 const Empty = ({ children }: { children: React.ReactNode }) =>
-  <p style={{ color: "rgba(242,236,224,0.35)", fontSize: 13, fontStyle: "italic" }}>{children}</p>
+  <p style={{ color: "rgba(242,236,224,0.35)", fontSize: 13 }}>{children}</p>
 
 const card: React.CSSProperties = { border: "1px solid rgba(184,148,74,0.18)", borderRadius: 14, padding: 16, marginTop: 10, background: "rgba(255,255,255,0.02)" }
 const formBox: React.CSSProperties = { ...card, display: "flex", flexDirection: "column", gap: 8 }
 const sectionLabel: React.CSSProperties = { fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(232,200,130,0.7)", marginBottom: 8 }
-const input: React.CSSProperties = { padding: "10px 12px", borderRadius: 9, border: "1px solid rgba(184,148,74,0.25)", background: "rgba(255,255,255,0.04)", color: "#f2ece0", fontSize: 14, outline: "none", fontFamily: "'EB Garamond', serif", resize: "vertical" }
-const addBtn = (busy: boolean): React.CSSProperties => ({ alignSelf: "flex-start", padding: "9px 18px", borderRadius: 999, border: "1px solid rgba(184,148,74,0.3)", background: "rgba(138,21,40,0.85)", color: "#f2ece0", fontSize: 13, cursor: "pointer", opacity: busy ? 0.6 : 1, fontFamily: "'EB Garamond', serif" })
-const smallBtn: React.CSSProperties = { padding: "6px 12px", borderRadius: 999, border: "1px solid rgba(184,148,74,0.3)", background: "rgba(255,255,255,0.05)", color: "#f2ece0", fontSize: 12, cursor: "pointer", fontFamily: "'EB Garamond', serif" }
-const ghostBtn: React.CSSProperties = { padding: "6px 12px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.12)", background: "transparent", color: "rgba(242,236,224,0.6)", fontSize: 12, cursor: "pointer", fontFamily: "'EB Garamond', serif" }
+const input: React.CSSProperties = { padding: "10px 12px", borderRadius: 9, border: "1px solid rgba(184,148,74,0.25)", background: "rgba(255,255,255,0.04)", color: "#f2ece0", fontSize: 14, outline: "none", resize: "vertical" }
+const addBtn = (busy: boolean): React.CSSProperties => ({ alignSelf: "flex-start", padding: "9px 18px", borderRadius: 999, border: "1px solid rgba(184,148,74,0.3)", background: "rgba(138,21,40,0.85)", color: "#f2ece0", fontSize: 13, cursor: "pointer", opacity: busy ? 0.6 : 1 })
+const smallBtn: React.CSSProperties = { padding: "6px 12px", borderRadius: 999, border: "1px solid rgba(184,148,74,0.3)", background: "rgba(255,255,255,0.05)", color: "#f2ece0", fontSize: 12, cursor: "pointer" }
+const ghostBtn: React.CSSProperties = { padding: "6px 12px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.12)", background: "transparent", color: "rgba(242,236,224,0.6)", fontSize: 12, cursor: "pointer" }

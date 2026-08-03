@@ -4,9 +4,10 @@ import { useRouter } from "next/navigation"
 import { createFreeGiftAction, grantFreeYearAction, type AdminStats, type AdminGift } from "./actions"
 import { giftLifecycle } from "@/lib/payments/entitlement"
 import { planLabel } from "@/lib/payments/plans"
+import { SupportLinks } from "@/components/ui/SupportLinks"
 
 export function AdminClient({
-  email, stats, gifts,
+  email, stats, gifts
 }: { email: string; stats: AdminStats; gifts: AdminGift[] }) {
   const router = useRouter()
   const refresh = () => router.refresh()
@@ -17,11 +18,11 @@ export function AdminClient({
   const money = (cents: number) =>
     new Intl.NumberFormat(undefined, {
       style: "currency",
-      currency: (stats.currency || "eur").toUpperCase(),
+      currency: (stats.currency || "eur").toUpperCase()
     }).format(cents / 100)
 
   return (
-    <div style={page}>
+    <div className="ui-surface" style={page}>
       <div style={{ maxWidth: 860, margin: "0 auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
           <h1 style={h1}>Operator</h1>
@@ -98,6 +99,8 @@ export function AdminClient({
         {gifts.map((g) => (
           <GiftRow key={g.id} gift={g} onDone={refresh} />
         ))}
+
+        <SupportLinks context="operator console" style={{ marginTop: 34 }} />
       </div>
     </div>
   )
@@ -109,7 +112,7 @@ function GiftRow({ gift, onDone }: { gift: AdminGift; onDone: () => void }) {
   const phase = giftLifecycle({ status: gift.status, paid: gift.paid, expires_at: gift.expires_at })
 
   const tone: Record<string, string> = {
-    live: "#7fd18b", draft: "#e8c882", expired: "#e07a8a", suspended: "#e07a8a",
+    live: "#7fd18b", draft: "#e8c882", expired: "#e07a8a", suspended: "#e07a8a"
   }
 
   return (
@@ -216,40 +219,37 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
 
 const page: React.CSSProperties = {
   height: "100dvh", overflowY: "auto", background: "#0a0205",
-  padding: "32px 20px 80px", color: "#f2ece0",
+  padding: "32px 20px 80px", color: "#f2ece0"
 }
 const h1: React.CSSProperties = {
-  fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 30, margin: 0,
+  fontSize: 30, margin: 0
 }
 const h2: React.CSSProperties = {
-  fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 21, margin: "30px 0 8px",
+  fontSize: 21, margin: "30px 0 8px"
 }
 const dim: React.CSSProperties = {
-  color: "rgba(242,236,224,0.45)", fontSize: 13, fontFamily: "'EB Garamond', serif",
-}
+  color: "rgba(242,236,224,0.45)", fontSize: 13 }
 const grid: React.CSSProperties = {
-  display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10,
+  display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10
 }
 const card: React.CSSProperties = {
   border: "1px solid rgba(184,148,74,0.18)", borderRadius: 14, padding: 16,
-  marginTop: 10, background: "rgba(255,255,255,0.02)",
+  marginTop: 10, background: "rgba(255,255,255,0.02)"
 }
 const th: React.CSSProperties = {
   textAlign: "left", padding: "8px 10px", fontSize: 10, letterSpacing: "0.16em",
   textTransform: "uppercase", color: "rgba(232,200,130,0.7)",
-  borderBottom: "1px solid rgba(184,148,74,0.2)", fontWeight: 400,
+  borderBottom: "1px solid rgba(184,148,74,0.2)", fontWeight: 400
 }
 const td: React.CSSProperties = {
-  padding: "10px", fontSize: 14, borderBottom: "1px solid rgba(184,148,74,0.08)",
-  fontFamily: "'EB Garamond', serif",
-}
+  padding: "10px", fontSize: 14, borderBottom: "1px solid rgba(184,148,74,0.08)"
+  }
 const btn: React.CSSProperties = {
   padding: "6px 12px", borderRadius: 999, border: "1px solid rgba(184,148,74,0.3)",
   background: "rgba(255,255,255,0.05)", color: "#f2ece0", fontSize: 12,
-  cursor: "pointer", fontFamily: "'EB Garamond', serif",
-}
+  cursor: "pointer" }
 const input: React.CSSProperties = {
   padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(184,148,74,0.25)",
   background: "rgba(255,255,255,0.04)", color: "#f2ece0", fontSize: 13,
-  fontFamily: "'EB Garamond', serif", flex: 1, minWidth: 120,
+  flex: 1, minWidth: 120
 }

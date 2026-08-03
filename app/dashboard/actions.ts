@@ -272,3 +272,20 @@ export async function sendOwnerMissYouAction(count: unknown) {
   const result = await srvSendMissYou(tenantId, "giver", fromName, n)
   return { ok: result.sent > 0, reason: null, ...result }
 }
+
+// ── First-run guide ──────────────────────────────────────────────────────────
+// Stored on the tenant rather than in localStorage so the guide doesn't reappear
+// when the owner opens the dashboard on their phone after setting it up on a
+// laptop. Kept inside `customization` to avoid a migration for one flag.
+export async function markTourSeenAction() {
+  const tenantId = await requireMyTenantId()
+  const sb = await getSaasServerClient()
+  const { data: t } = await sb.from("tenants").select("customization").eq("id", tenantId).single()
+  const customization = {
+    ...((t?.customization as Record<string, unknown>) ?? {}),
+    tourSeenAt: new Date().toISOString(),
+  }
+  const { error } = await sb.from("tenants").update({ customization }).eq("id", tenantId)
+  if (error) throw new Error(error.message)
+  revalidatePath("/dashboard")
+}

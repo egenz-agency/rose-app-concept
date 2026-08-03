@@ -1,0 +1,103 @@
+<!--
+  Supabase → Authentication → Emails → Confirm signup
+
+  Subject:  Your code to begin 🌹
+
+  This template matters even though sign-in and sign-up are now one flow: when
+  signInWithOtp() is called for an address that has no account yet, Supabase
+  sends THIS template rather than Magic Link. If it still contained a link
+  instead of {{ .Token }}, first-time users would get a link while returning
+  users got a code — the confusing half-broken state.
+
+  Code-only, no link — see the note in magic-link.html for why including
+  {{ .ConfirmationURL }} would let a mail scanner invalidate the code.
+-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+       style="margin:0;padding:0;background-color:#0a0205;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"
+             style="width:100%;max-width:600px;background-color:#120409;border:1px solid rgba(184,148,74,0.28);border-radius:18px;overflow:hidden;">
+
+        <!-- Banner -->
+        <tr>
+          <td align="center" style="padding:38px 28px 26px;background-color:#1a060e;border-bottom:1px solid rgba(184,148,74,0.22);">
+            <img src="https://rose-app-multitenant.vercel.app/icon-192.png"
+                 width="88" height="88" alt="The Enchanted Rose"
+                 style="display:block;width:88px;height:88px;border:0;border-radius:20px;" />
+            <div style="height:16px;line-height:16px;">&nbsp;</div>
+            <div style="font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:27px;line-height:1.25;color:#f2ece0;">
+              The Enchanted Rose
+            </div>
+            <div style="height:6px;line-height:6px;">&nbsp;</div>
+            <div style="font-family:Georgia,'Times New Roman',serif;font-size:13px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(232,200,130,0.75);">
+              Welcome
+            </div>
+          </td>
+        </tr>
+
+        <!-- Intro -->
+        <tr>
+          <td style="padding:32px 34px 0;">
+            <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:16px;line-height:1.65;color:#f2ece0;">
+              Enter this code and your rose is ready to build — messages, moments and memories,
+              all waiting for you.
+            </p>
+          </td>
+        </tr>
+
+        <!-- The code -->
+        <tr>
+          <td align="center" style="padding:24px 34px 6px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+              <tr>
+                <td align="center" bgcolor="#1e0a12"
+                    style="border-radius:14px;border:1px solid rgba(232,200,130,0.42);padding:22px 16px;">
+                  <div style="font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:38px;line-height:1.1;letter-spacing:0.34em;color:#e8c882;font-weight:bold;">
+                    {{ .Token }}
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td align="center" style="padding:14px 34px 0;">
+            <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:13.5px;line-height:1.65;color:rgba(242,236,224,0.55);">
+              The code expires shortly and can be used once. If it stops working, just ask for a new one.
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:26px 34px 32px;">
+            <div style="height:1px;line-height:1px;background-color:rgba(184,148,74,0.18);font-size:0;">&nbsp;</div>
+            <p style="margin:18px 0 0;font-family:Georgia,'Times New Roman',serif;font-size:12.5px;line-height:1.65;color:rgba(242,236,224,0.45);">
+              Didn't sign up? Ignore this email — no account exists until this code is used, and we'll
+              never ask you for it.
+            </p>
+          </td>
+        </tr>
+      </table>
+
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"
+             style="width:100%;max-width:600px;">
+        <tr>
+          <td align="center" style="padding:20px 24px 8px;">
+            <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:11.5px;line-height:1.7;color:rgba(242,236,224,0.35);">
+              Iliyan Tachev · zhk. Levski V, bl. 26, Sofia, Bulgaria<br />
+              <a href="https://rose-app-multitenant.vercel.app/legal/privacy" style="color:rgba(232,200,130,0.6);text-decoration:none;">Privacy</a>
+              &nbsp;·&nbsp;
+              <a href="https://rose-app-multitenant.vercel.app/legal/terms" style="color:rgba(232,200,130,0.6);text-decoration:none;">Terms</a>
+              &nbsp;·&nbsp;
+              <a href="mailto:killiyan22@gmail.com" style="color:rgba(232,200,130,0.6);text-decoration:none;">Contact</a>
+            </p>
+          </td>
+        </tr>
+      </table>
+
+    </td>
+  </tr>
+</table>

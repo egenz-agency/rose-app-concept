@@ -45,6 +45,9 @@ export default async function DashboardPage() {
   // Purely cosmetic: whether to show the console link. /admin does its own
   // check and 404s regardless, so this never becomes the actual gate.
   const isOperator = (await getOperator()) !== null
+  // First visit after signing up → run the guide. Flag lives on the tenant, so
+  // it doesn't reappear on their phone after they set the gift up on a laptop.
+  const tourSeen = Boolean((tenant.customization as Record<string, unknown> | null)?.tourSeenAt)
 
   return (
     <DashboardClient
@@ -54,6 +57,7 @@ export default async function DashboardPage() {
       email={user.email ?? ""}
       media={{ introVideoUrl, songUrl }}
       isOperator={isOperator}
+      tourSeen={tourSeen}
     />
   )
 }

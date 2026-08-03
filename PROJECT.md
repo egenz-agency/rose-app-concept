@@ -59,6 +59,23 @@ Share → Add to Home Screen instructions on iOS (which has no install API), and
 once installed. On iPhone this is the only route to push notifications. New icons cut from
 `public/logo.png`.
 
+**Passwordless sign-in.** One flow for everyone: enter an email, get a numeric code,
+you're in (the account is created on first use). No passwords, so no reset flow — which
+went through email anyway, protecting nothing the inbox didn't already gate. Deliberately a
+**code, not a magic link**: Gmail/Outlook pre-fetch URLs in mail and Supabase's link is
+single-use, so a scanner burns it before the human clicks. Templates in
+`supabase/email-templates/` are code-only for the same reason — the link and the code are
+the same token, so including the URL would let a scanner invalidate the code.
+
+**Two typefaces, split by audience.** The gift keeps Cormorant + EB Garamond; the owner's
+surfaces (dashboard, operator console, sign-in, legal) use **Work Sans**. Serif is the
+default because the recipient's experience is the product; owner surfaces opt in with
+`.ui-surface`. See *Typography* below.
+
+**Support + first-run guide.** "Report a bug" / "Contact us" open a prefilled mailto with
+diagnostics attached. A seven-step guide runs on the first dashboard visit, reopenable from
+the footer.
+
 **Known gaps.** One account still manages only **one gift** (every dashboard query takes the
 oldest), so repeat purchases need a second account — the operator console works around this
 for your own testing. `STRIPE_AUTOMATIC_TAX` is off pending VAT registration. Custom SMTP is
@@ -840,6 +857,32 @@ storage **path**, and `lib/server/media.ts` mints a 6-hour signed URL at render 
 `/r/[slug]` and the dashboard, both *after* the gates. A public bucket was the hole here: a
 public URL outlives expiry, refund, and deletion, so "revoke their access" silently excluded
 the video and the song. Verified: public URL → 400, signed → 200, tampered token → 400.
+
+### Typography
+Two identities, on purpose. Three tokens in `globals.css`:
+
+| Token | Font | Where |
+|---|---|---|
+| `--font-display` | Cormorant Garamond | gift headings |
+| `--font-body` | EB Garamond | gift body — and the **default** for `body` |
+| `--font-ui` | Work Sans | anything inside `.ui-surface` |
+
+Serif is the default because the **recipient's** experience is the product; the owner's
+surfaces opt in by putting `.ui-surface` on their root element. Changing the product's UI
+typeface is therefore one line, not the 77 inline declarations it used to be.
+
+Two non-obvious details:
+- **`button, input, select, textarea { font-family: inherit }`** — form controls do *not*
+  inherit font-family; browsers substitute their own UI font. Without that reset every
+  button and field silently falls back to Arial regardless of the surface. That is exactly
+  why the font used to be repeated inline on all of them.
+- **Owner headings dropped italic.** In a serif, italic reads as elegance; in a sans it
+  reads as emphasis. Hierarchy there now comes from weight (500) and tighter tracking.
+  For the same reason, buttons lost their positive letter-spacing — tracking suits serif
+  caps and small labels, but thins out a sans at body size.
+
+Shared components (`InstallAppButton`, `SupportLinks`) set no font at all, so they inherit
+whichever surface they're rendered into — serif on the gift page, sans on the dashboard.
 
 ### Operator console (`/admin`)
 | Piece | File |

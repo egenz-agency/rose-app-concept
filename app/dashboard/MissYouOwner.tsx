@@ -5,7 +5,7 @@ import {
   isEnabled,
   enableMissYou,
   sendMissYou,
-  fetchPartnerName,
+  fetchPartnerName
 } from "@/lib/push/missYouOwner"
 
 // Rapid taps batch into one "×N" ping so her lock screen gets one warm buzz.
@@ -109,7 +109,7 @@ export function MissYouOwner({ recipientName }: { recipientName: string | null }
                     top: 0,
                     fontSize: 16,
                     pointerEvents: "none",
-                    animation: "missYouFloat 1.4s ease-out forwards",
+                    animation: "missYouFloat 1.4s ease-out forwards"
                   }}
                   onAnimationEnd={() => setHearts((h) => h.filter((x) => x !== id))}
                 >
@@ -153,22 +153,21 @@ const card: React.CSSProperties = {
   borderRadius: 14,
   padding: 16,
   marginTop: 10,
-  background: "rgba(255,255,255,0.02)",
+  background: "rgba(255,255,255,0.02)"
 }
 const sectionLabel: React.CSSProperties = {
   fontSize: 11,
   letterSpacing: "0.18em",
   textTransform: "uppercase",
   color: "rgba(232,200,130,0.7)",
-  marginBottom: 8,
+  marginBottom: 8
 }
 const hint: React.CSSProperties = {
   margin: "10px 0 12px",
   fontSize: 12.5,
   lineHeight: 1.5,
-  color: "rgba(242,236,224,0.45)",
-  fontFamily: "'EB Garamond', serif",
-}
+  color: "rgba(242,236,224,0.45)"
+  }
 const addBtn = (busy: boolean): React.CSSProperties => ({
   alignSelf: "flex-start",
   padding: "9px 18px",
@@ -178,9 +177,8 @@ const addBtn = (busy: boolean): React.CSSProperties => ({
   color: "#f2ece0",
   fontSize: 13,
   cursor: busy ? "default" : "pointer",
-  opacity: busy ? 0.6 : 1,
-  fontFamily: "'EB Garamond', serif",
-})
+  opacity: busy ? 0.6 : 1
+  })
 const heartBtn: React.CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
@@ -191,6 +189,5 @@ const heartBtn: React.CSSProperties = {
   background: "linear-gradient(135deg, rgba(138,21,40,0.95), rgba(100,12,28,0.98))",
   color: "#f2ece0",
   fontSize: 13.5,
-  cursor: "pointer",
-  fontFamily: "'EB Garamond', serif",
-}
+  cursor: "pointer"
+  }

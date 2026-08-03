@@ -15,15 +15,15 @@ export const LEGAL = {
   contactEmail: "killiyan22@gmail.com",
   privacyEmail: "killiyan22@gmail.com",
   website: "rose-app-multitenant.vercel.app",
-  lastUpdated: "1 August 2026",
+  lastUpdated: "1 August 2026"
 }
 
 export function LegalLayout({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <main style={{ height: "100dvh", overflowY: "auto", background: "#0a0205", color: "rgba(242,236,224,0.82)", fontFamily: "'EB Garamond', Georgia, serif" }}>
+    <main style={{ height: "100dvh", overflowY: "auto", background: "#0a0205", color: "rgba(242,236,224,0.82)" }}>
       <div style={{ maxWidth: 760, margin: "0 auto", padding: "48px 22px 90px" }}>
         <Link href="/" style={{ color: "rgba(232,200,130,0.75)", fontSize: 13, textDecoration: "none" }}>← Back</Link>
-        <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontStyle: "italic", fontSize: 34, color: "#f2ece0", margin: "18px 0 6px" }}>{title}</h1>
+        <h1 style={{ fontSize: 34, color: "#f2ece0", margin: "18px 0 6px" }}>{title}</h1>
         <p style={{ fontSize: 13, color: "rgba(242,236,224,0.4)", marginBottom: 8 }}>Last updated: {LEGAL.lastUpdated}</p>
 
         <div style={{ fontSize: 12, color: "rgba(232,200,130,0.7)", background: "rgba(184,148,74,0.08)", border: "1px solid rgba(184,148,74,0.2)", borderRadius: 10, padding: "10px 14px", margin: "10px 0 26px" }}>
@@ -45,7 +45,7 @@ export function LegalLayout({ title, children }: { title: string; children: Reac
 const link = { color: "rgba(242,236,224,0.55)", textDecoration: "none" }
 
 export function H2({ children }: { children: ReactNode }) {
-  return <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, color: "#f2ece0", margin: "28px 0 8px" }}>{children}</h2>
+  return <h2 style={{ fontSize: 22, color: "#f2ece0", margin: "28px 0 8px" }}>{children}</h2>
 }
 export function P({ children }: { children: ReactNode }) {
   return <p style={{ margin: "0 0 12px" }}>{children}</p>

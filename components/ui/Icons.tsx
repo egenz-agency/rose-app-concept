@@ -119,3 +119,55 @@ export const HeartIcon = (p: IconProps) => (
     <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
   </svg>
 )
+
+// ── Support + media icons ────────────────────────────────────────────────────
+// Added for the support links and the media upload controls. Same 1.25 stroke
+// as everything above; emoji were removed in favour of these.
+
+export const BugIcon = (p: IconProps) => (
+  <svg {...S(p)}>
+    <rect x="8" y="8" width="8" height="12" rx="4" />
+    <path d="M8 12H4M8 16H5M16 12h4M16 16h3" />
+    <path d="M9.5 8a2.5 2.5 0 0 1 5 0" />
+    <path d="M9 5.5 8 4M15 5.5 16 4" />
+  </svg>
+)
+
+export const FilmIcon = (p: IconProps) => (
+  <svg {...S(p)}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="M8 5v14M16 5v14" />
+    <path d="M3 12h18" />
+  </svg>
+)
+
+export const MusicIcon = (p: IconProps) => (
+  <svg {...S(p)}>
+    <path d="M9 18V6l10-2v12" />
+    <circle cx="6.5" cy="18" r="2.5" />
+    <circle cx="16.5" cy="16" r="2.5" />
+  </svg>
+)
+
+export const UploadIcon = (p: IconProps) => (
+  <svg {...S(p)}>
+    <path d="M12 16V4" />
+    <polyline points="7,9 12,4 17,9" />
+    <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+  </svg>
+)
+
+export const CheckIcon = (p: IconProps) => (
+  <svg {...S(p)}>
+    <polyline points="4,12.5 9.5,18 20,6.5" />
+  </svg>
+)
+
+export const TrashIcon = (p: IconProps) => (
+  <svg {...S(p)}>
+    <path d="M4 7h16" />
+    <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+    <path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12" />
+    <path d="M10 11v6M14 11v6" />
+  </svg>
+)

@@ -61,7 +61,7 @@ export function InstallAppButton({
   label = "Install the app",
   hint = "Add it to your home screen so it opens like a real app.",
   compact = false,
-  style,
+  style
 }: {
   label?: string
   hint?: string
@@ -134,11 +134,9 @@ const btn: React.CSSProperties = {
   padding: "9px 16px", borderRadius: 999,
   border: "1px solid rgba(232,200,130,0.45)",
   background: "rgba(232,200,130,0.12)",
-  color: "#f6eeda", fontSize: 13.5, cursor: "pointer",
-  fontFamily: "'EB Garamond', serif",
-}
+  color: "#f6eeda", fontSize: 13.5, cursor: "pointer"
+  }
 
 const hintText: React.CSSProperties = {
   margin: "8px 0 0", fontSize: 12, lineHeight: 1.5,
-  color: "rgba(242,236,224,0.45)", fontFamily: "'EB Garamond', serif",
-}
+  color: "rgba(242,236,224,0.45)" }
