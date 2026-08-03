@@ -27,15 +27,28 @@ export async function getOperator(): Promise<Operator | null> {
   const user = await getCurrentUser()
   if (!user) return null
 
-  const { data, error } = await getAdminClient()
-    .from("app_admins")
-    .select("user_id")
-    .eq("user_id", user.id)
-    .eq("role", "masteradmin")
-    .maybeSingle()
+  // Fails CLOSED, never loudly. getAdminClient() throws when the service-role
+  // key is missing, and this runs while rendering the dashboard — so without
+  // this catch a misconfigured deployment turns "is this person an admin?"
+  // into a 500 for every signed-in buyer. Not being able to answer the question
+  // means "not an operator", which is the safe answer anyway.
+  try {
+    const { data, error } = await getAdminClient()
+      .from("app_admins")
+      .select("user_id")
+      .eq("user_id", user.id)
+      .eq("role", "masteradmin")
+      .maybeSingle()
 
-  if (error || !data) return null
-  return { userId: user.id, email: user.email ?? "" }
+    if (error || !data) return null
+    return { userId: user.id, email: user.email ?? "" }
+  } catch (err) {
+    console.error(
+      "[admin] operator check could not run — is ROSE_SAAS_SERVICE_ROLE_KEY set?",
+      err instanceof Error ? err.message : err
+    )
+    return null
+  }
 }
 
 // Use at the top of every admin server action. Throws rather than returning a

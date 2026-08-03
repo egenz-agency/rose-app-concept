@@ -42,9 +42,20 @@ export async function signMedia(stored: string | null | undefined): Promise<stri
     const { data, error } = await getAdminClient()
       .storage.from(BUCKET)
       .createSignedUrl(path, SIGNED_URL_TTL_SECONDS)
-    if (error) return null
+    if (error) {
+      console.error(`[media] could not sign ${path}:`, error.message)
+      return null
+    }
     return data?.signedUrl ?? null
-  } catch {
+  } catch (err) {
+    // getAdminClient() throws when the service-role key is missing. Returning
+    // null degrades to the default video/song rather than 500-ing the page —
+    // but log it, or a misconfigured deployment just looks like the owner's
+    // upload silently vanished.
+    console.error(
+      "[media] signing unavailable — is ROSE_SAAS_SERVICE_ROLE_KEY set?",
+      err instanceof Error ? err.message : err
+    )
     return null
   }
 }
