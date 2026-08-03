@@ -52,6 +52,13 @@ upgrading someone never rewrites past revenue.
 both email whatever address is typed in — without a challenge that's a spam cannon pointed at
 strangers, sent from our domain. Invisible for real users; inert until the site key is set.
 
+**Installable apps.** Three distinct PWAs on one origin, each with its own `start_url`: the
+gift (`/g/<token>`, so an installed app re-establishes her access cookie), the owner dashboard
+(`/dashboard`), and the root. `InstallAppButton` prompts on Chrome/Android, falls back to
+Share → Add to Home Screen instructions on iOS (which has no install API), and renders nothing
+once installed. On iPhone this is the only route to push notifications. New icons cut from
+`public/logo.png`.
+
 **Known gaps.** One account still manages only **one gift** (every dashboard query takes the
 oldest), so repeat purchases need a second account — the operator console works around this
 for your own testing. `STRIPE_AUTOMATIC_TAX` is off pending VAT registration. Custom SMTP is

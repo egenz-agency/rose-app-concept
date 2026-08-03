@@ -7,7 +7,11 @@ import { CreateGift } from "./CreateGift"
 import { DashboardClient } from "./DashboardClient"
 
 export const dynamic = "force-dynamic"
-export const metadata: Metadata = { robots: { index: false, follow: false } }
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+  // The OWNER's installable app — reopens the dashboard, not the root or a gift.
+  manifest: "/dashboard/manifest.webmanifest",
+}
 
 // The authenticated buyer dashboard. Auth-gated; replaces the shared "thebeauty"
 // /rosesecret for the productized gift. RLS scopes every query to the buyer.

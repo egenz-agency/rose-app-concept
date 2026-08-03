@@ -10,6 +10,7 @@ import { MissYouOwner } from "./MissYouOwner"
 import { GiftStatus } from "./GiftStatus"
 import { isGiftLive } from "@/lib/payments/entitlement"
 import { LEGAL } from "@/components/legal/LegalLayout"
+import { InstallAppButton } from "@/components/ui/InstallAppButton"
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Row = Record<string, any>
@@ -58,6 +59,13 @@ export function DashboardClient({
 
         {/* Gift link — or the paywall in front of it while unpaid/expired */}
         <GiftStatus tenant={tenant} />
+
+        {/* Install the owner app. Removes itself once installed. */}
+        <InstallAppButton
+          label="Install the owner app"
+          hint="Keep your gift one tap away — and get her “I miss you” notifications on your phone."
+          style={{ marginTop: 14 }}
+        />
 
         {/* "I miss you" — reach her from here, no need to open her gift link.
             Pointless before the gift is live: she has no device registered yet. */}

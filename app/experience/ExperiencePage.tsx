@@ -12,6 +12,7 @@ import { FinalDeathScene } from "@/components/ui/FinalDeathScene"
 import { LettersPanel } from "@/components/ui/LettersPanel"
 import { MemoryStarPanel } from "@/components/ui/MemoryStarPanel"
 import { NavigationHUD } from "@/components/ui/NavigationHUD"
+import { InstallAppButton } from "@/components/ui/InstallAppButton"
 import { GrowthSimulator } from "@/components/ui/GrowthSimulator"
 import { MissedDayPreview } from "@/components/ui/MissedDayPreview"
 import { MissYouButton } from "@/components/ui/MissYouButton"
@@ -231,6 +232,18 @@ function ExperienceInner({ slug, config }: { slug?: string; config?: TenantConfi
       <MissedDayPreview />
       <MissYouButton />
       <ViewControls />
+
+      {/* Add-to-home-screen, top-left (the only corner the HUD, view controls
+          and "I miss you" button leave free). Only while IDLE, so it can never
+          sit over the intro or a cinematic — and it removes itself once the app
+          is installed. On iPhone this is the ONLY way to get notifications. */}
+      {phase === "IDLE" && (
+        <InstallAppButton
+          compact
+          label="Add to home screen"
+          style={{ position: "fixed", top: 24, left: 20, zIndex: 30 }}
+        />
+      )}
 
       {phase === "IDLE" && <IdleHint />}
     </div>
