@@ -32,6 +32,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...except the documented template, which MUST be in the repo — it's the
+# only record of which variables production needs.
+!.env.example
 
 # vercel
 .vercel
