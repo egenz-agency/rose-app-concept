@@ -183,7 +183,8 @@ async function getDueReveal(totalVisits: number, now: Date): Promise<Moment | nu
     if (sm) {
       moment = {
         id: `msg-${Date.now()}`, title: sm.author, message: sm.message,
-        photo_url: null, video_url: null, trigger_visit: null, trigger_date: null,
+        photo_url: null, video_url: null, audio_url: null,
+        trigger_visit: null, trigger_date: null,
         repeat_every: null, shown: true, shown_at: null, created_at: new Date().toISOString(),
       }
     }
@@ -198,6 +199,9 @@ export interface Moment {
   message: string | null
   photo_url: string | null
   video_url: string | null
+  // A SIGNED url by the time it reaches the client. Stored as a private-bucket
+  // path (unlike photo_url/video_url, which are external links the owner pasted).
+  audio_url: string | null
   trigger_visit: number | null   // show on/after this visit number
   trigger_date: string | null    // OR show on/after this date (ISO)
   repeat_every: number | null    // OR recur every N visits (e.g. 3 = every 3rd visit)

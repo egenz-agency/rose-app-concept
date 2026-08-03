@@ -1,6 +1,7 @@
 import "server-only"
 import { differenceInDays, isToday, parseISO } from "date-fns"
 import { getAdminClient } from "@/lib/supabase/admin"
+import { signMedia } from "@/lib/server/media"
 import type { RoseState } from "@/types/scene"
 import type { Moment, ScheduledMessage, StarRow, MilestoneInfo } from "@/lib/supabase/queries"
 
@@ -210,7 +211,8 @@ export async function fetchMoments(tenantId: string): Promise<Moment[]> {
       .order("trigger_visit", { ascending: true, nullsFirst: false })
       .order("trigger_date", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: true })
-    return (data ?? []) as Moment[]
+    const list = (data ?? []) as Moment[]
+    return Promise.all(list.map(async (m) => (await withSignedAudio(m)) ?? m))
   } catch {
     return []
   }
@@ -289,14 +291,25 @@ async function consumeDueMoment(tenantId: string, totalVisits: number, today: Da
   }
 }
 
+// A voice note lives in the PRIVATE bucket, so the stored value is a path and
+// has to be exchanged for a short-lived signed URL before it leaves the server.
+// Doing it here — at the single point where a moment is handed to the recipient
+// — means an expired or refunded gift stops serving the audio along with
+// everything else, rather than needing its own check.
+async function withSignedAudio(moment: Moment | null): Promise<Moment | null> {
+  if (!moment?.audio_url) return moment
+  return { ...moment, audio_url: await signMedia(moment.audio_url) }
+}
+
 async function getDueReveal(tenantId: string, totalVisits: number, now: Date): Promise<Moment | null> {
-  let moment = await consumeDueMoment(tenantId, totalVisits, now)
+  let moment = await withSignedAudio(await consumeDueMoment(tenantId, totalVisits, now))
   if (!moment) {
     const sm = await getScheduledMessageReveal(tenantId, now)
     if (sm) {
       moment = {
         id: `msg-${Date.now()}`, title: sm.author, message: sm.message,
-        photo_url: null, video_url: null, trigger_visit: null, trigger_date: null,
+        photo_url: null, video_url: null, audio_url: null,
+        trigger_visit: null, trigger_date: null,
         repeat_every: null, shown: true, shown_at: null, created_at: new Date().toISOString(),
       }
     }

@@ -13,6 +13,7 @@ import { LEGAL } from "@/components/legal/LegalLayout"
 import { InstallAppButton } from "@/components/ui/InstallAppButton"
 import { SupportLinks } from "@/components/ui/SupportLinks"
 import { DashboardTour, ReopenTourButton } from "./DashboardTour"
+import { VoiceRecorder } from "./VoiceRecorder"
 import { FilmIcon, MusicIcon, UploadIcon, CheckIcon, TrashIcon } from "@/components/ui/Icons"
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -96,21 +97,16 @@ export function DashboardClient({
         </Section>
 
         {/* Moments */}
-        <Section title="Moments (photo / clip / message)">
+        <Section title="Moments (photo / clip / voice / message)">
           <AddMoment onDone={refresh} />
           {moments.length === 0 && <Empty>No moments yet.</Empty>}
           {moments.map((m) => (
             <RowItem key={m.id}
-              title={m.title || m.message || "(media)"}
-              subtitle={momentWhen(m)}
+              title={m.title || m.message || (m.audio_url ? "Voice message" : "(media)")}
+              subtitle={`${m.audio_url ? "voice · " : ""}${momentWhen(m)}`}
               onDelete={async () => { await deleteMomentAction(m.id); refresh() }}
             />
           ))}
-        </Section>
-
-        {/* Danger zone — GDPR right to erasure */}
-        <Section title="Account">
-          <DangerZone />
         </Section>
 
         <footer style={{ marginTop: 36, paddingTop: 18, borderTop: "1px solid rgba(184,148,74,0.12)", display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12 }}>
@@ -119,6 +115,11 @@ export function DashboardClient({
           <a href="/legal/cookies" style={footLink}>Cookies</a>
           <a href={`mailto:${LEGAL.contactEmail}`} style={footLink}>Contact</a>
           <ReopenTourButton />
+          {/* GDPR right to erasure. A footer link rather than a permanent
+              red-bordered panel: it's a rare, terminal action, and giving it a
+              whole section made the dashboard feel like it was warning you
+              about something every visit. */}
+          <DeleteAccountLink />
         </footer>
 
         <SupportLinks context="owner dashboard" style={{ marginTop: 22 }} />
@@ -127,40 +128,64 @@ export function DashboardClient({
   )
 }
 
-function DangerZone() {
+function DeleteAccountLink() {
   const router = useRouter()
-  const [confirming, setConfirming] = useState(false)
+  const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
   return (
-    <div style={{ ...card, borderColor: "rgba(200,60,60,0.28)" }}>
-      <div style={sectionLabel}>Delete account &amp; all data</div>
-      <p style={{ fontSize: 13, color: "rgba(242,236,224,0.5)", marginBottom: 12 }}>
-        Permanently deletes your account, every gift you created, and all uploaded media. This cannot be undone.
-      </p>
-      {!confirming ? (
-        <button onClick={() => setConfirming(true)} style={{ ...smallBtn, color: "#e07a8a", borderColor: "rgba(200,60,60,0.35)" }}>
-          Delete my account
-        </button>
-      ) : (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <button
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true); setError(null)
-              try { await deleteAccountAction(); router.replace("/login") }
-              catch (e) { setError(e instanceof Error ? e.message : "Failed"); setBusy(false) }
-            }}
-            style={{ ...smallBtn, background: "rgba(160,20,30,0.85)", color: "#f6eeda", borderColor: "rgba(200,60,60,0.5)" }}
-          >
-            {busy ? "Deleting…" : "Yes, permanently delete everything"}
-          </button>
-          <button onClick={() => setConfirming(false)} disabled={busy} style={ghostBtn}>Cancel</button>
+    <>
+      <button onClick={() => setOpen(true)} style={{ ...footLink, background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 12 }}>
+        Delete account
+      </button>
+
+      {open && (
+        <div style={confirmBackdrop} role="dialog" aria-modal="true" aria-label="Delete account">
+          <div style={confirmPanel}>
+            <div style={{ ...sectionLabel, color: "#e07a8a" }}>Delete account &amp; all data</div>
+            <p style={{ fontSize: 14, lineHeight: 1.6, color: "rgba(242,236,224,0.7)", margin: "0 0 6px" }}>
+              This permanently deletes your account, every gift you made, and all uploaded media.
+            </p>
+            <p style={{ fontSize: 13, lineHeight: 1.6, color: "rgba(242,236,224,0.45)", margin: "0 0 18px" }}>
+              Her rose stops working immediately. This cannot be undone.
+            </p>
+
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <button className="ctl" onClick={() => { setOpen(false); setError(null) }} disabled={busy} style={ghostBtn}>
+                Keep my account
+              </button>
+              <button
+                className="ctl"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true); setError(null)
+                  try { await deleteAccountAction(); router.replace("/login") }
+                  catch (e) { setError(e instanceof Error ? e.message : "Failed"); setBusy(false) }
+                }}
+                style={{ ...smallBtn, background: "rgba(160,20,30,0.85)", color: "#f6eeda", borderColor: "rgba(200,60,60,0.5)", padding: "9px 16px" }}
+              >
+                {busy ? "Deleting…" : "Delete everything"}
+              </button>
+            </div>
+            {error && <p style={{ color: "#e07a8a", fontSize: 12, marginTop: 10 }}>{error}</p>}
+          </div>
         </div>
       )}
-      {error && <p style={{ color: "#e07a8a", fontSize: 12, marginTop: 8 }}>{error}</p>}
-    </div>
+    </>
   )
+}
+
+const confirmBackdrop: React.CSSProperties = {
+  position: "fixed", inset: 0, zIndex: 70,
+  background: "rgba(6,2,4,0.82)", backdropFilter: "blur(6px)",
+  display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+}
+const confirmPanel: React.CSSProperties = {
+  width: "100%", maxWidth: 420, background: "#140510",
+  border: "1px solid rgba(200,60,60,0.35)", borderRadius: 18,
+  padding: "22px 22px 20px", color: "#f2ece0",
+  boxShadow: "0 24px 70px rgba(0,0,0,0.6)",
 }
 
 const footLink: React.CSSProperties = { color: "rgba(242,236,224,0.5)", textDecoration: "none" }
@@ -339,6 +364,7 @@ function AddMoment({ onDone }: { onDone: () => void }) {
   const [visit, setVisit] = useState("")
   const [date, setDate] = useState("")
   const [repeat, setRepeat] = useState("")
+  const [audioPath, setAudioPath] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   return (
     <form
@@ -349,11 +375,14 @@ function AddMoment({ onDone }: { onDone: () => void }) {
           await addMomentAction({
             title, message,
             photo_url: photo || null, video_url: video || null,
+            audio_url: audioPath,
             trigger_visit: kind === "visit" && visit ? parseInt(visit, 10) : null,
             trigger_date: kind === "date" ? date || null : null,
             repeat_every: kind === "repeat" && repeat ? parseInt(repeat, 10) : null
           })
-          setTitle(""); setMessage(""); setPhoto(""); setVideo(""); setVisit(""); setDate(""); setRepeat(""); onDone()
+          setTitle(""); setMessage(""); setPhoto(""); setVideo("")
+          setVisit(""); setDate(""); setRepeat(""); setAudioPath(null)
+          onDone()
         } finally { setBusy(false) }
       }}
       style={formBox}
@@ -362,6 +391,9 @@ function AddMoment({ onDone }: { onDone: () => void }) {
       <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Message (optional)" rows={2} style={input} />
       <input value={photo} onChange={(e) => setPhoto(e.target.value)} placeholder="Photo URL (optional)" style={input} />
       <input value={video} onChange={(e) => setVideo(e.target.value)} placeholder="Video URL (optional)" style={input} />
+
+      <VoiceRecorder value={audioPath} onChange={setAudioPath} />
+
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <select value={kind} onChange={(e) => setKind(e.target.value as any)} style={{ ...input, width: 150 }}>
           <option value="visit">On visit number</option>

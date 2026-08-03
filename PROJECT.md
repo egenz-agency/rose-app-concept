@@ -76,6 +76,20 @@ default because the recipient's experience is the product; owner surfaces opt in
 diagnostics attached. A seven-step guide runs on the first dashboard visit, reopenable from
 the footer.
 
+**Voice messages.** A moment can carry a recorded voice note — recorded in the browser via
+MediaRecorder, or an uploaded audio file for browsers without it. Stored in the **private**
+bucket as a path and signed at render, so a lapsed or refunded gift stops serving it along
+with everything else. Note the asymmetry: `photo_url`/`video_url` are external links the
+owner pastes; `audio_url` is our storage path.
+
+**She can keep it.** Every revealed moment has a Save control — photo, video, voice, or the
+words as a `.txt` when there's no media. Implemented as a blob fetch rather than
+`<a download>`, which browsers ignore cross-origin, so a signed Supabase URL would otherwise
+navigate away from the gift instead of saving.
+
+**Operator console shows engagement.** Each gift lists streak, total visits and when it was
+last tended — a gift that is live but never tended is the signal worth seeing.
+
 **Known gaps.** One account still manages only **one gift** (every dashboard query takes the
 oldest), so repeat purchases need a second account — the operator console works around this
 for your own testing. `STRIPE_AUTOMATIC_TAX` is off pending VAT registration. Custom SMTP is
@@ -117,7 +131,7 @@ The site has one visitor. It does not need to scale. It needs to feel like it wa
 | Animation | GSAP 3 + Framer Motion 11 |
 | State | Zustand 4 |
 | Data | TanStack Query 5 + Supabase |
-| Fonts | Cormorant Garamond (display) + EB Garamond (body) |
+| Fonts | Cormorant Garamond + EB Garamond (the gift) · Work Sans (owner surfaces) |
 
 **Critical:** R3F v9 is required — v8 uses `ReactCurrentOwner` which was removed in React 19. Always install with `--legacy-peer-deps`.
 
@@ -902,6 +916,11 @@ Free roses: `grant_complimentary_year(slug, note)` writes a **€0 ledger row** 
 stay auditable and never inflate revenue. Reuses `record_gift_payment`, keeping entitlement
 maths in one place.
 
+Engagement: each gift row shows **streak, total visits and when it was last tended**. A gift
+that is *live but never tended* is the signal worth watching — it means the link was bought
+but never really landed. `listGiftsAction` embeds `rose_state` through its foreign key, so
+this stays one query rather than N+1.
+
 To move masteradmin to another account, delete the row first — the unique index enforces one.
 
 ### Packages (plans)
@@ -922,6 +941,45 @@ happens in **Supabase** — no `siteverify` endpoint of our own. Notes:
   switching CAPTCHA on in Supabase → Project Settings → Authentication → Bot and Abuse
   Protection. Reversing it locks out every account until the toggle is switched back off.
 - The widget's domain list must include `localhost` or local sign-in fails.
+
+### Voice messages
+A moment can carry a recorded voice note. `app/dashboard/VoiceRecorder.tsx` records via
+MediaRecorder, with a file picker for browsers without it.
+
+| Piece | File |
+|---|---|
+| Recorder + file fallback | `app/dashboard/VoiceRecorder.tsx` |
+| Upload action | `uploadVoiceAction` in `app/dashboard/actions.ts` |
+| Path validation | `cleanStoragePath` in `lib/security/validate.ts` |
+| Signing on delivery | `withSignedAudio` in `lib/server/tenantQueries.ts` |
+| Playback | `components/ui/MomentPanel.tsx` |
+| Column | `scheduled_moments.audio_url` |
+
+⚠️ **`audio_url` is a storage PATH, not a URL** — unlike `photo_url`/`video_url` beside it,
+which hold external links the owner pastes in. A voice note is recorded in the app, so it
+lives in the private `tenant-media` bucket and is signed at render time. That means a lapsed
+or refunded gift stops serving it along with everything else, with no separate check.
+
+Things that took a specific decision:
+- **Format is whatever the browser produces** — Chrome/Firefox `audio/webm` (opus), Safari
+  `audio/mp4`. Both are accepted; forcing one silently breaks recording on half of all
+  phones. The mime check compares the *base* type because MediaRecorder reports
+  `audio/webm;codecs=opus`.
+- **Uploads when recording stops**, not when the moment is saved, so a failed upload surfaces
+  next to the microphone rather than on submit.
+- **The mic is released on unmount**, or the browser keeps showing its recording indicator.
+- `cleanStoragePath` is the first user-supplied *path* in the codebase (everything else is a
+  URL or a UUID), so it rejects traversal, absolute paths, backslashes and anything outside
+  the caller's own tenant folder. Tested against all of those.
+
+### Saving a moment
+Every revealed moment offers a Save control — photo, video, voice, or the words as `.txt`
+when there is no media (`components/ui/SaveMoment.tsx`).
+
+Deliberately **not** `<a download>`: that attribute is ignored for cross-origin responses, and
+the media sits on Supabase's storage domain behind a signed URL. The browser would navigate
+to the file instead of saving it — on a phone, that means leaving the gift. So the bytes are
+fetched and handed back as a same-origin `blob:` URL, which always saves.
 
 ### Stripe conventions this integration follows
 - **Never** pass `payment_method_types` — it would disable dynamic payment methods and lock
@@ -957,5 +1015,6 @@ npm run build
 
 ---
 
-*Last updated: 1 August 2026 — payments, entitlement gating, refund revocation and private
-media added on the `multi-tenant` branch. See "What's new" at the top.*
+*Last updated: 4 August 2026 — payments, entitlement gating, refund revocation, private
+media, the operator console, passwordless sign-in and voice messages, all on the
+`multi-tenant` branch. See "What's new" at the top.*

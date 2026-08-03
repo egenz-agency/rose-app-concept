@@ -88,6 +88,11 @@ export interface AdminGift {
   access_token: string
   owner_email: string | null
   created_at: string
+  // Engagement, from rose_state. Null when the row is missing (shouldn't
+  // happen — create_my_tenant seeds it — but the console must not crash on it).
+  streak_days: number | null
+  total_visits: number | null
+  last_visited: string | null
 }
 
 // Every gift in the system, so the operator can find and open any of them —
@@ -98,9 +103,22 @@ export async function listGiftsAction(): Promise<AdminGift[]> {
   const sb = getAdminClient()
   const { data } = await sb
     .from("tenants")
-    .select("id, slug, recipient_name, status, paid, expires_at, plan, access_token, owner_email, created_at")
+    .select("id, slug, recipient_name, status, paid, expires_at, plan, access_token, owner_email, created_at, rose_state(streak_days, total_visits, last_visited)")
     .order("created_at", { ascending: false })
-  return (data ?? []) as AdminGift[]
+
+  // The embed arrives as an array (or an object, depending on how PostgREST
+  // reads the relationship) — flatten it so the UI doesn't care which.
+  return (data ?? []).map((row) => {
+    const r = row as Record<string, unknown>
+    const state = Array.isArray(r.rose_state) ? r.rose_state[0] : r.rose_state
+    const st = (state ?? {}) as Record<string, unknown>
+    return {
+      ...(r as unknown as AdminGift),
+      streak_days: (st.streak_days as number | undefined) ?? null,
+      total_visits: (st.total_visits as number | undefined) ?? null,
+      last_visited: (st.last_visited as string | undefined) ?? null,
+    }
+  })
 }
 
 // Create a rose owned by the operator and comp it a free year. This is the

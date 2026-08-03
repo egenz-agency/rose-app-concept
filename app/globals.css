@@ -250,3 +250,13 @@ button, input, select, textarea, optgroup {
 .ui-surface table, .ui-surface [data-numeric] {
   font-variant-numeric: tabular-nums;
 }
+
+/* Recording indicator — a slow pulse so it reads as "live" without demanding
+   attention. Opacity/transform only, and stilled for reduced-motion users. */
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .45; transform: scale(.82); }
+}
+@media (prefers-reduced-motion: reduce) {
+  [style*="pulseDot"] { animation: none !important; }
+}

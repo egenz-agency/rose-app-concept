@@ -134,7 +134,19 @@ function GiftRow({ gift, onDone }: { gift: AdminGift; onDone: () => void }) {
         </span>
       </div>
 
-      <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+      {/* Engagement. A gift that's live but never tended is the signal worth
+          seeing — it means the link was bought but never really landed. */}
+      <div style={{ display: "flex", gap: 18, marginTop: 10, flexWrap: "wrap", alignItems: "baseline" }} data-numeric>
+        <Metric label="Streak" value={gift.streak_days ?? 0} unit={gift.streak_days === 1 ? "day" : "days"} warm={(gift.streak_days ?? 0) > 0} />
+        <Metric label="Visits" value={gift.total_visits ?? 0} />
+        <span style={{ ...dim, fontSize: 11.5 }}>
+          {gift.last_visited
+            ? `last tended ${relativeDays(gift.last_visited)}`
+            : "never tended"}
+        </span>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
         {phase === "live" && (
           <a href={`/g/${gift.access_token}`} target="_blank" rel="noreferrer" style={{ ...btn, textDecoration: "none" }}>
             Open gift
@@ -156,6 +168,26 @@ function GiftRow({ gift, onDone }: { gift: AdminGift; onDone: () => void }) {
       {err && <p style={{ color: "#e07a8a", fontSize: 12, marginTop: 8 }}>{err}</p>}
     </div>
   )
+}
+
+function Metric({ label, value, unit, warm }: { label: string; value: number; unit?: string; warm?: boolean }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "baseline", gap: 5 }}>
+      <span style={{ ...dim, fontSize: 10, letterSpacing: "0.16em", textTransform: "uppercase" }}>{label}</span>
+      <span style={{ fontSize: 15, color: warm ? "#e8c882" : "#f2ece0", fontVariantNumeric: "tabular-nums" }}>{value}</span>
+      {unit && <span style={{ ...dim, fontSize: 11.5 }}>{unit}</span>}
+    </span>
+  )
+}
+
+// Deliberately coarse. The exact hour a rose was tended is noise; what matters
+// at a glance is whether it was today, recently, or long enough ago that the
+// streak is about to break (the rose dies after three missed days).
+function relativeDays(iso: string): string {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
+  if (days <= 0) return "today"
+  if (days === 1) return "yesterday"
+  return `${days} days ago`
 }
 
 function CreateFreeRose({ onDone }: { onDone: () => void }) {

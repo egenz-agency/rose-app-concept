@@ -171,3 +171,19 @@ export const TrashIcon = (p: IconProps) => (
     <path d="M10 11v6M14 11v6" />
   </svg>
 )
+
+export const DownloadIcon = (p: IconProps) => (
+  <svg {...S(p)}>
+    <path d="M12 4v12" />
+    <polyline points="7,11 12,16 17,11" />
+    <path d="M4 18v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1" />
+  </svg>
+)
+
+export const MicIcon = (p: IconProps) => (
+  <svg {...S(p)}>
+    <rect x="9" y="3" width="6" height="11" rx="3" />
+    <path d="M5 11a7 7 0 0 0 14 0" />
+    <path d="M12 18v3M9 21h6" />
+  </svg>
+)

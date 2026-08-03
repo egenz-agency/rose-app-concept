@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache"
 import { getSaasServerClient, getCurrentUser } from "@/lib/supabase/saasServer"
 import { getAdminClient } from "@/lib/supabase/admin"
 import {
-  cleanSlug, cleanText, cleanDate, cleanHttpUrl, cleanInt, validateUpload, LIMITS,
+  cleanSlug, cleanText, cleanDate, cleanHttpUrl, cleanInt, cleanStoragePath, validateUpload, LIMITS,
 } from "@/lib/security/validate"
 import { enforceRateLimit } from "@/lib/security/ratelimit"
 import { isGiftLive } from "@/lib/payments/entitlement"
@@ -115,6 +115,7 @@ export async function addMomentAction(input: {
   trigger_visit?: number | null
   trigger_date?: string | null
   repeat_every?: number | null
+  audio_url?: string | null
 }) {
   const tenantId = await requireMyTenantId()
   await enforceRateLimit(`moment:${tenantId}`, 60, 3600)
@@ -128,6 +129,8 @@ export async function addMomentAction(input: {
     trigger_visit: cleanInt(input?.trigger_visit, 1, 100000),
     trigger_date: cleanDate(input?.trigger_date),
     repeat_every: cleanInt(input?.repeat_every, 1, 3650),
+    // A storage path, not a URL — and scoped to this tenant's own folder.
+    audio_url: cleanStoragePath(input?.audio_url, tenantId),
   })
   if (error) throw new Error(error.message)
   revalidatePath("/dashboard")
@@ -288,4 +291,25 @@ export async function markTourSeenAction() {
   const { error } = await sb.from("tenants").update({ customization }).eq("id", tenantId)
   if (error) throw new Error(error.message)
   revalidatePath("/dashboard")
+}
+
+
+// ── Voice messages ───────────────────────────────────────────────────────────
+// Uploads a recorded (or chosen) voice note and returns its storage PATH for
+// attaching to a moment. Separate from uploadMediaAction because that one
+// writes into the tenant's `customization`; a voice note belongs to one moment,
+// so the path is handed back to the caller instead.
+export async function uploadVoiceAction(formData: FormData): Promise<{ path: string }> {
+  const tenantId = await requireMyTenantId()
+  await enforceRateLimit(`voice:${tenantId}`, 40, 3600) // 40/hour per gift
+
+  const file = formData.get("file") as File | null
+  const { ext } = validateUpload("voice", file)
+
+  const path = `${tenantId}/voice-${Date.now()}.${ext}`
+  const { error } = await getAdminClient().storage.from("tenant-media").upload(path, file!, {
+    cacheControl: "31536000", upsert: false, contentType: file!.type || undefined,
+  })
+  if (error) throw new Error(error.message)
+  return { path }
 }

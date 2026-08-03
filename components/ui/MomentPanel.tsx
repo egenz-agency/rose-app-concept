@@ -1,7 +1,8 @@
 "use client"
 import { motion, AnimatePresence } from "framer-motion"
 import { useSceneStore } from "@/lib/store/sceneStore"
-import { CloseIcon } from "./Icons"
+import { SaveMoment } from "./SaveMoment"
+import { MicIcon, CloseIcon } from "./Icons"
 
 // Shows a scheduled "moment" — a photo, a clip, and/or a message the owner
 // pre-loaded for this visit/date — as a tender full-screen reveal after tending.
@@ -71,6 +72,15 @@ export function MomentPanel() {
                   />
                 )}
 
+                {moment.audio_url && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 14, border: "1px solid rgba(184,148,74,0.22)", background: "rgba(255,255,255,0.03)" }}>
+                    <MicIcon size={16} color="rgba(201,168,76,0.85)" />
+                    {/* preload="none" — a voice note shouldn't start fetching
+                        before she's chosen to listen, especially on mobile data. */}
+                    <audio src={moment.audio_url} controls preload="none" style={{ flex: 1, minWidth: 0, height: 36 }} />
+                  </div>
+                )}
+
                 {moment.message && (
                   <p
                     className="t-serif"
@@ -79,6 +89,21 @@ export function MomentPanel() {
                     {moment.message}
                   </p>
                 )}
+
+                {/* Hers to keep. Media saves the file; a words-only moment
+                    saves the words, so there's always something to take away. */}
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {moment.photo_url && <SaveMoment url={moment.photo_url} baseName={moment.title || "photo"} label="Save photo" />}
+                  {moment.video_url && <SaveMoment url={moment.video_url} baseName={moment.title || "video"} label="Save video" />}
+                  {moment.audio_url && <SaveMoment url={moment.audio_url} baseName={moment.title || "voice-message"} label="Save voice" />}
+                  {!moment.photo_url && !moment.video_url && !moment.audio_url && moment.message && (
+                    <SaveMoment
+                      text={`${moment.title ? moment.title + "\n\n" : ""}${moment.message}`}
+                      baseName={moment.title || "message"}
+                      label="Save these words"
+                    />
+                  )}
+                </div>
 
                 <button
                   onClick={close}

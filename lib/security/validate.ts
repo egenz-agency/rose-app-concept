@@ -104,20 +104,51 @@ export const UPLOAD_RULES = {
     exts: ["mp3", "ogg", "wav", "aac", "m4a"],
     label: "an MP3/OGG/WAV audio file (max 15 MB)",
   },
+  // A recorded voice note. Wider mime list than `song` because MediaRecorder
+  // emits whatever the browser prefers: Chrome/Firefox give audio/webm (opus),
+  // Safari gives audio/mp4. Both must be accepted or recording silently fails
+  // on half the devices. Smaller cap — this is a spoken message, not a track.
+  voice: {
+    maxBytes: 10 * 1024 * 1024, // 10 MB — several minutes of speech
+    mimes: [
+      "audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/mp3",
+      "audio/wav", "audio/x-wav", "audio/aac", "audio/x-m4a",
+    ],
+    exts: ["webm", "ogg", "mp4", "m4a", "mp3", "wav", "aac"],
+    label: "a voice recording (max 10 MB)",
+  },
 } as const
 
 export type UploadKind = keyof typeof UPLOAD_RULES
 
 export function validateUpload(kind: string, file: File | null): { kind: UploadKind; ext: string } {
-  if (kind !== "intro" && kind !== "song") throw new ValidationError("Unsupported media type.")
+  if (kind !== "intro" && kind !== "song" && kind !== "voice") {
+    throw new ValidationError("Unsupported media type.")
+  }
   const rule = UPLOAD_RULES[kind]
   if (!file || file.size === 0) throw new ValidationError("No file provided.")
   if (file.size > rule.maxBytes) throw new ValidationError(`File too large — please upload ${rule.label}.`)
 
   const ext = (file.name.split(".").pop() || "").toLowerCase().replace(/[^a-z0-9]/g, "")
-  const mimeOk = (rule.mimes as readonly string[]).includes(file.type)
+  const baseMime = (file.type || "").split(";")[0].trim().toLowerCase()
+  const mimeOk = (rule.mimes as readonly string[]).includes(baseMime)
   const extOk = (rule.exts as readonly string[]).includes(ext)
   if (!mimeOk || !extOk) throw new ValidationError(`Unsupported file — please upload ${rule.label}.`)
 
   return { kind, ext }
+}
+
+// A storage path inside the tenant-media bucket: "<tenant-uuid>/<filename>".
+// Distinct from cleanHttpUrl because voice notes live in OUR private bucket and
+// are stored as paths, not URLs. Rejects traversal and anything not scoped to
+// the caller's own tenant folder — the tenantId is resolved server-side, so a
+// crafted value can't reach another gift's media.
+export function cleanStoragePath(v: unknown, tenantId: string): string | null {
+  if (typeof v !== "string") return null
+  const s = v.trim()
+  if (!s || s.length > 300) return null
+  if (s.includes("..") || s.startsWith("/") || s.includes("\\")) return null
+  if (!s.startsWith(`${tenantId}/`)) return null
+  if (!/^[A-Za-z0-9/_.-]+$/.test(s)) return null
+  return s
 }
