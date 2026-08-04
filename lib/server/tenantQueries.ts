@@ -3,7 +3,9 @@ import { differenceInDays, isToday, parseISO } from "date-fns"
 import { getAdminClient } from "@/lib/supabase/admin"
 import { signMedia } from "@/lib/server/media"
 import type { RoseState } from "@/types/scene"
-import type { Moment, ScheduledMessage, StarRow, MilestoneInfo } from "@/lib/supabase/queries"
+import type { Moment, ScheduledMessage, MilestoneInfo } from "@/lib/supabase/queries"
+import type { StarRow, MemoryCapsuleInput } from "@/lib/supabase/starColumns"
+import { baseStarColumns, capsuleStarColumns, isMissingColumnError } from "@/lib/supabase/starColumns"
 
 // ────────────────────────────────────────────────────────────────────────────
 // Server-side, TENANT-SCOPED data layer for the multi-tenant `rose-saas` project.
@@ -371,7 +373,7 @@ const MAX_STARS_PER_TENANT = 300
 
 export async function createMemoryStar(
   tenantId: string,
-  star: { title: string; date: string; memory: string; photos: string[]; position: [number, number, number] }
+  star: MemoryCapsuleInput
 ): Promise<StarRow> {
   const sb = getAdminClient()
   // Hard ceiling so a gift can never accumulate unbounded rows.
@@ -382,22 +384,23 @@ export async function createMemoryStar(
   if ((count ?? 0) >= MAX_STARS_PER_TENANT) {
     throw new Error("This constellation is full.")
   }
+
+  const base = { tenant_id: tenantId, ...baseStarColumns(star) }
   const { data, error } = await sb
     .from("memory_stars")
-    .insert({
-      tenant_id: tenantId,
-      title: star.title,
-      date: star.date,
-      memory: star.memory,
-      photos: star.photos,
-      position_x: star.position[0],
-      position_y: star.position[1],
-      position_z: star.position[2],
-    })
+    .insert({ ...base, ...capsuleStarColumns(star) })
     .select()
     .single()
-  if (error) throw error
-  return data as StarRow
+  if (!error && data) return data as StarRow
+
+  // Migration 008 hasn't been applied to this project yet — save the memory with
+  // the columns that do exist rather than dropping what she just wrote.
+  if (isMissingColumnError(error)) {
+    const retry = await sb.from("memory_stars").insert(base).select().single()
+    if (retry.error) throw retry.error
+    return retry.data as StarRow
+  }
+  throw error
 }
 
 // ── Rose state + visit ───────────────────────────────────────────────────────

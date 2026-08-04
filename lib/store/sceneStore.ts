@@ -4,6 +4,13 @@ import { subscribeWithSelector } from "zustand/middleware"
 import type { ScenePhase, RoseState, GardenStage } from "@/types/scene"
 import type { Moment } from "@/lib/supabase/queries"
 
+/**
+ * Where the camera is in the one continuous world the rose and the constellation
+ * share. There is no second scene and no second page — only a point of view that
+ * travels up from the flower toward the sky above it, and back down again.
+ */
+export type UniverseMode = "rose" | "ascending" | "universe" | "descending"
+
 // Per-tenant customization the gift experience reads (multi-tenant product).
 export interface TenantConfig {
   recipientName: string | null
@@ -52,6 +59,40 @@ interface SceneStore {
   // Per-tenant customization (intro video, song, names). null in legacy mode.
   tenantConfig: TenantConfig | null
 
+  // ── Memory Constellation ──
+  // The constellation lives in the SAME 3D world as the rose, suspended high
+  // above it. "ascending" / "descending" are the cinematic vertical travel; the
+  // camera is scripted during those and free during "rose" / "universe".
+  universeMode: UniverseMode
+  // Bumped to play the "Reveal Constellation" line animation.
+  revealTick: number
+  // Bumped to re-frame the whole constellation (double tap).
+  recenterTick: number
+  // The constellation slot whose memory capsule is open, or null.
+  activeSlot: number | null
+  // True while the completion sequence plays (every star ignites at once).
+  igniting: boolean
+  // True while the first-visit guide to the sky is on screen. The sky's own
+  // controls step aside for it rather than stacking underneath.
+  guideActive: boolean
+  // The arrival cinematic: the camera sweeps around the constellation while it
+  // is shown finished. Scripted, so OrbitControls stands down for its duration.
+  overtureActive: boolean
+  // Which beat of the cinematic the camera has reached. Driven by the camera
+  // timeline itself, so the words can never drift out of sync with the shot.
+  overtureBeat: number
+  // Render the sky as it will be once every star holds a memory — every star
+  // warm, every connection drawn. A vision of the finished thing, never the
+  // real state, and always faded back out afterwards.
+  visionActive: boolean
+  // Constellation growth preview. null = off (show the real sky). A number
+  // stands in for `rose.totalVisits`, letting the owner walk the sky forward day
+  // by day without waiting months for it. Purely local — nothing is ever written.
+  previewDays: number | null
+  // In preview, also write a memory into every star that wakes — the growth path
+  // of a couple who tends the rose and records something each day.
+  previewFill: boolean
+
   setPhase: (phase: ScenePhase) => void
   setRose: (rose: RoseState) => void
   setDailyMessage: (msg: string) => void
@@ -75,6 +116,17 @@ interface SceneStore {
   setActiveMoment: (m: Moment | null) => void
   setTenantSlug: (slug: string | null) => void
   setTenantConfig: (c: TenantConfig | null) => void
+  setUniverseMode: (m: UniverseMode) => void
+  triggerReveal: () => void
+  triggerRecenter: () => void
+  setActiveSlot: (slot: number | null) => void
+  setIgniting: (v: boolean) => void
+  setGuideActive: (v: boolean) => void
+  setPreviewDays: (d: number | null) => void
+  setPreviewFill: (v: boolean) => void
+  setOvertureActive: (v: boolean) => void
+  setOvertureBeat: (n: number) => void
+  setVisionActive: (v: boolean) => void
 }
 
 export const useSceneStore = create<SceneStore>()(
@@ -102,6 +154,17 @@ export const useSceneStore = create<SceneStore>()(
     activeMoment: null,
     tenantSlug: null,
     tenantConfig: null,
+    universeMode: "rose",
+    revealTick: 0,
+    recenterTick: 0,
+    activeSlot: null,
+    igniting: false,
+    guideActive: false,
+    overtureActive: false,
+    overtureBeat: -1,
+    visionActive: false,
+    previewDays: null,
+    previewFill: true,
 
     setPhase: (phase) =>
       set((s) => ({ phase, previousPhase: s.phase })),
@@ -140,6 +203,18 @@ export const useSceneStore = create<SceneStore>()(
     setActiveMoment: (m) => set({ activeMoment: m }),
     setTenantSlug: (slug) => set({ tenantSlug: slug }),
     setTenantConfig: (c) => set({ tenantConfig: c }),
+
+    setUniverseMode: (m) => set({ universeMode: m }),
+    triggerReveal: () => set((s) => ({ revealTick: s.revealTick + 1 })),
+    triggerRecenter: () => set((s) => ({ recenterTick: s.recenterTick + 1 })),
+    setActiveSlot: (slot) => set({ activeSlot: slot }),
+    setIgniting: (v) => set({ igniting: v }),
+    setGuideActive: (v) => set({ guideActive: v }),
+    setPreviewDays: (d) => set({ previewDays: d }),
+    setPreviewFill: (v) => set({ previewFill: v }),
+    setOvertureActive: (v) => set({ overtureActive: v, ...(v ? { overtureBeat: -1 } : {}) }),
+    setOvertureBeat: (n) => set({ overtureBeat: n }),
+    setVisionActive: (v) => set({ visionActive: v }),
   }))
 )
 

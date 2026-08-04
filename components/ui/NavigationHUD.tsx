@@ -1,12 +1,16 @@
 "use client"
 import { motion, AnimatePresence } from "framer-motion"
 import { useSceneStore } from "@/lib/store/sceneStore"
-import { RoseIcon, LetterIcon, StarIcon } from "./Icons"
+import { RoseIcon, LetterIcon, StarIcon, SparkleIcon } from "./Icons"
 
 const NAV_ITEMS = [
   { id: "care",         label: "Tend Rose",  Icon: RoseIcon,   phase: "CARING" as const },
   { id: "letters",     label: "Letters",    Icon: LetterIcon, panel: "letters" },
   { id: "memory-stars",label: "Stars",      Icon: StarIcon,   panel: "memory-stars" },
+  // The way up to the constellation. It lives here rather than floating at the
+  // bottom of the screen, where a real gift already stacks the "I miss you"
+  // button and its hint — and where it stayed hidden behind the emergence.
+  { id: "universe",     label: "Universe",   Icon: SparkleIcon, ascend: true },
 ]
 
 export function NavigationHUD() {
@@ -15,8 +19,18 @@ export function NavigationHUD() {
   const openPanel = useSceneStore((s) => s.openPanel)
   const closePanel = useSceneStore((s) => s.closePanel)
   const activePanelId = useSceneStore((s) => s.activePanelId)
+  const universeMode = useSceneStore((s) => s.universeMode)
+  const setUniverseMode = useSceneStore((s) => s.setUniverseMode)
+  const isEmergence = useSceneStore((s) => s.isEmergence)
+  const magicActive = useSceneStore((s) => s.magicActive)
 
-  const isVisible = ["IDLE","CARING","VIEWING_STAR","VIEWING_LETTER"].includes(phase)
+  // The flight up can't start while a cinematic already owns the camera.
+  const cameraIsBusy = isEmergence || magicActive
+
+  const isVisible =
+    ["IDLE","CARING","VIEWING_STAR","VIEWING_LETTER"].includes(phase) &&
+    // The nav belongs to the rose; the sky has its own, quieter controls.
+    universeMode === "rose"
 
   return (
     <AnimatePresence>
@@ -42,19 +56,24 @@ export function NavigationHUD() {
               const isActive =
                 (item.phase && phase === item.phase) ||
                 (item.panel && activePanelId === item.panel)
+              const disabled = Boolean(item.ascend) && cameraIsBusy
 
               return (
                 <motion.button
                   key={item.id}
+                  disabled={disabled}
                   onClick={() => {
+                    if (disabled) return
                     if (item.phase) { closePanel(); setPhase(item.phase) }
                     if (item.panel) { setPhase("IDLE"); openPanel(item.panel) }
+                    if (item.ascend) { closePanel(); setUniverseMode("ascending") }
                   }}
                   className="relative flex items-center gap-2 px-4 py-2 rounded-full"
                   style={{
                     background: isActive ? "rgba(138, 21, 40, 0.45)" : "transparent",
                     border: isActive ? "1px solid rgba(184, 148, 74, 0.22)" : "1px solid transparent",
-                    cursor: "pointer",
+                    opacity: disabled ? 0.35 : 1,
+                    cursor: disabled ? "default" : "pointer",
                     transition: "all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
                   }}
                   whileHover={{ scale: 1.02 }}

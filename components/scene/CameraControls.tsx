@@ -30,6 +30,7 @@ export function CameraControls() {
   const viewPreset  = useSceneStore((s) => s.viewPreset)
   const viewTick    = useSceneStore((s) => s.viewTick)
   const isEmergence = useSceneStore((s) => s.isEmergence)
+  const universeMode = useSceneStore((s) => s.universeMode)
   const { camera }  = useThree()
   const controlsRef = useRef<OrbitControlsImpl>(null)
 
@@ -71,7 +72,11 @@ export function CameraControls() {
   // Suspend OrbitControls during emergence so GSAP can sweep the camera freely
   // without damping / autoRotate fighting the animation. OrbitControls remounts
   // when emergence ends and picks up from the GSAP final position.
-  const interactive = (phase === "IDLE" || phase === "INSTRUCTIONS") && !isEmergence
+  //
+  // The same applies once the camera leaves for the constellation: from that
+  // moment ConstellationCamera owns the view, all the way up and back down.
+  const interactive =
+    (phase === "IDLE" || phase === "INSTRUCTIONS") && !isEmergence && universeMode === "rose"
   if (!interactive) return null
 
   return (

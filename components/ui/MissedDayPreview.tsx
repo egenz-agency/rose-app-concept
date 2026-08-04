@@ -11,6 +11,7 @@ const MAX_PETALS = 40
 // fallen, the next press clears the floor and starts over. Nothing is saved.
 export function MissedDayPreview() {
   const phase          = useSceneStore((s) => s.phase)
+  const universeMode = useSceneStore((s) => s.universeMode)
   const petalsFallen   = useSceneStore((s) => s.petalsFallen)
   const addFallenPetal = useSceneStore((s) => s.addFallenPetal)
   const setFallenPetals = useSceneStore((s) => s.setFallenPetals)
@@ -18,7 +19,8 @@ export function MissedDayPreview() {
   const [caption, setCaption] = useState<null | "fall" | "reset">(null)
   const captionRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const isVisible = phase === "IDLE"
+  // Belongs to the rose — hidden once the camera climbs to the constellation.
+  const isVisible = phase === "IDLE" && universeMode === "rose"
   const allFallen = petalsFallen.length >= MAX_PETALS
 
   const preview = useCallback(() => {

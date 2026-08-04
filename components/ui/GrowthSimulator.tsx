@@ -15,13 +15,15 @@ const STAGES = [
 
 export function GrowthSimulator() {
   const phase               = useSceneStore((s) => s.phase)
+  const universeMode = useSceneStore((s) => s.universeMode)
   const setSimulationPetals = useSceneStore((s) => s.setSimulationPetals)
   const [open, setOpen]     = useState(false)
   const [stage, setStage]   = useState(0)
   const [playing, setPlaying] = useState(false)
   const playRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const isVisible = phase === "IDLE" || phase === "CARING"
+  // Belongs to the rose — hidden once the camera climbs to the constellation.
+  const isVisible = (phase === "IDLE" || phase === "CARING") && universeMode === "rose"
 
   // Sync 3D scene to current stage
   useEffect(() => {

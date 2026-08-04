@@ -17,8 +17,16 @@ import { useSceneStore } from "@/lib/store/sceneStore"
 export function PostProcessing() {
   const phase = useSceneStore((s) => s.phase)
   const rose = useSceneStore((s) => s.rose)
+  const universeMode = useSceneStore((s) => s.universeMode)
+  const igniting = useSceneStore((s) => s.igniting)
+
+  // Up in the sky the stars ARE the image, so they get a far more generous
+  // bloom and a lower threshold — that soft halo is what makes a point of light
+  // read as a star rather than a dot.
+  const inSky = universeMode !== "rose"
 
   const bloomIntensity =
+    inSky ? (igniting ? 1.55 : 1.05) :
     phase === "CARING" ? 1.2 :
     phase === "REVIVAL" ? 2.0 :
     phase === "FINAL_DEATH" ? 0.15 :
@@ -29,11 +37,15 @@ export function PostProcessing() {
     <EffectComposer multisampling={4} enableNormalPass={false}>
       <Bloom
         intensity={bloomIntensity}
-        luminanceThreshold={0.9}
+        luminanceThreshold={inSky ? 0.42 : 0.9}
         luminanceSmoothing={0.9}
         mipmapBlur
       />
-      <Vignette darkness={0.55} offset={0.3} blendFunction={BlendFunction.NORMAL} />
+      <Vignette
+        darkness={inSky ? 0.72 : 0.55}
+        offset={inSky ? 0.22 : 0.3}
+        blendFunction={BlendFunction.NORMAL}
+      />
     </EffectComposer>
   )
 }

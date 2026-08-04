@@ -12,6 +12,17 @@ export interface LocalStar {
   position_y: number
   position_z: number
   created_at: string
+  // Memory Constellation capsule fields — optional so stars saved by an older
+  // build still parse.
+  constellation_index?: number | null
+  slot_index?: number | null
+  video_url?: string | null
+  voice_url?: string | null
+  song_url?: string | null
+  location?: string | null
+  quote?: string | null
+  is_favorite?: boolean | null
+  is_anniversary?: boolean | null
 }
 
 function load(): LocalStar[] {

@@ -13,6 +13,7 @@
 // signatures — they don't need to know which mode they're in.
 
 import * as legacy from "@/lib/supabase/queries"
+import type { MemoryCapsuleInput } from "@/lib/supabase/starColumns"
 import { useSceneStore } from "@/lib/store/sceneStore"
 import {
   fetchRoseStateAction,
@@ -48,13 +49,7 @@ export function fetchMemoryStars() {
   return s ? fetchMemoryStarsAction(s) : legacy.fetchMemoryStars()
 }
 
-export function createMemoryStar(star: {
-  title: string
-  date: string
-  memory: string
-  photos: string[]
-  position: [number, number, number]
-}) {
+export function createMemoryStar(star: MemoryCapsuleInput) {
   const s = slug()
   return s ? createMemoryStarAction(s, star) : legacy.createMemoryStar(star)
 }

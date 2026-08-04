@@ -12,8 +12,11 @@ export function ViewControls() {
   const phase = useSceneStore((s) => s.phase)
   const viewPreset = useSceneStore((s) => s.viewPreset)
   const setViewPreset = useSceneStore((s) => s.setViewPreset)
+  const universeMode = useSceneStore((s) => s.universeMode)
 
-  const isVisible = phase === "IDLE"
+  // These vantages belong to the rose. Once the camera climbs to the
+  // constellation the sky gets the frame to itself.
+  const isVisible = phase === "IDLE" && universeMode === "rose"
 
   return (
     <AnimatePresence>

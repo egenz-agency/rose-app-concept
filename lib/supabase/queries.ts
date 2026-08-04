@@ -1,6 +1,13 @@
 import { getSupabaseClient } from "./client"
 import { differenceInDays, isToday, parseISO } from "date-fns"
 import type { RoseState } from "@/types/scene"
+import type { StarRow, MemoryCapsuleInput } from "./starColumns"
+import {
+  baseStarColumns,
+  capsuleStarColumns,
+  isMissingColumnError,
+  isFilled,
+} from "./starColumns"
 
 const ROSE_ID = "00000000-0000-0000-0000-000000000001"
 
@@ -472,10 +479,11 @@ async function checkLetterUnlocks(totalVisits: number) {
   }
 }
 
-export type StarRow = {
-  id: string; title: string; date: string; memory: string; photos: string[];
-  position_x: number; position_y: number; position_z: number; created_at: string;
-}
+// The row shape and its column helpers live in ./starColumns so the server-only
+// tenant data layer can share them without importing the browser client. They
+// are re-exported here because every existing caller imports them from queries.
+export type { StarRow, MemoryCapsuleInput }
+export { baseStarColumns, capsuleStarColumns, isMissingColumnError, isFilled }
 
 export async function fetchMemoryStars(): Promise<StarRow[]> {
   // Always merge localStorage stars so the app works without Supabase
@@ -496,35 +504,29 @@ export async function fetchMemoryStars(): Promise<StarRow[]> {
   }
 }
 
-export async function createMemoryStar(star: {
-  title: string
-  date: string
-  memory: string
-  photos: string[]
-  position: [number, number, number]
-}): Promise<StarRow> {
-  const payload = {
-    title: star.title,
-    date: star.date,
-    memory: star.memory,
-    photos: star.photos,
-    position_x: star.position[0],
-    position_y: star.position[1],
-    position_z: star.position[2],
-  }
+export async function createMemoryStar(star: MemoryCapsuleInput): Promise<StarRow> {
+  const base = baseStarColumns(star)
+  const full = { ...base, ...capsuleStarColumns(star) }
 
   try {
     const sb = getSupabaseClient()
     const { data, error } = await sb
-      .from("memory_stars").insert(payload).select().single()
+      .from("memory_stars").insert(full).select().single()
     if (!error && data) return data as StarRow
+
+    // Migration 006 not applied yet — keep the memory rather than lose it, and
+    // write what this database can actually hold.
+    if (isMissingColumnError(error)) {
+      const retry = await sb.from("memory_stars").insert(base).select().single()
+      if (!retry.error && retry.data) return retry.data as StarRow
+    }
   } catch {
     // Supabase unavailable — fall through to localStorage
   }
 
   // localStorage fallback: always works offline / with placeholder credentials
   const { localStars_create } = await import("./localStars")
-  return localStars_create(payload)
+  return localStars_create(full)
 }
 
 export async function fetchLetters(): Promise<{

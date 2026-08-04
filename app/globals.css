@@ -54,7 +54,13 @@
   --glass-shine:   inset 0 1px 0 rgba(255, 248, 240, 0.08);
 }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* This reset MUST stay inside @layer base. Unlayered CSS outranks every layered
+   rule, so as a bare selector it silently beat Tailwind's `@layer utilities` and
+   nulled out every padding and margin utility in the app — 90 of them across 14
+   files, all quietly doing nothing. */
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+}
 
 html {
   background: var(--bg);
@@ -144,6 +150,59 @@ body::after {
   -webkit-backdrop-filter: blur(28px) saturate(160%);
   box-shadow: var(--glass-shine), 0 32px 64px rgba(0,0,0,0.55);
 }
+
+/* ─── Memory capsule fields ──────────────────────────────────── */
+/* These inputs are styled inline, which can't express :focus. Without a ring the
+   field is invisible to anyone navigating by keyboard. */
+.capsule-field {
+  transition: border-color 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.capsule-field::placeholder { color: rgba(242, 236, 224, 0.26); }
+.capsule-field:hover { border-color: rgba(184, 148, 74, 0.26) !important; }
+.capsule-field:focus,
+.capsule-field:focus-visible {
+  border-color: rgba(201, 168, 76, 0.5) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 248, 240, 0.05),
+              0 0 0 3px rgba(201, 168, 76, 0.09);
+}
+
+/* ─── Growth preview scrubber ────────────────────────────────── */
+.constellation-scrub {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 248, 240, 0.1);
+  outline: none;
+  cursor: pointer;
+}
+.constellation-scrub::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--gold);
+  border: 1px solid rgba(255, 236, 190, 0.55);
+  box-shadow: 0 0 12px rgba(201, 168, 76, 0.5);
+  cursor: grab;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.constellation-scrub::-webkit-slider-thumb:active { transform: scale(1.18); cursor: grabbing; }
+.constellation-scrub::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--gold);
+  border: 1px solid rgba(255, 236, 190, 0.55);
+  box-shadow: 0 0 12px rgba(201, 168, 76, 0.5);
+  cursor: grab;
+}
+.constellation-scrub:focus-visible { box-shadow: 0 0 0 3px rgba(201, 168, 76, 0.18); }
 
 /* ─── Glow effects ───────────────────────────────────────────── */
 .glow-crimson {

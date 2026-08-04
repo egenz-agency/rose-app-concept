@@ -11,6 +11,13 @@ import { RevivalPanel } from "@/components/ui/RevivalPanel"
 import { FinalDeathScene } from "@/components/ui/FinalDeathScene"
 import { LettersPanel } from "@/components/ui/LettersPanel"
 import { MemoryStarPanel } from "@/components/ui/MemoryStarPanel"
+import { ConstellationHUD } from "@/components/ui/ConstellationHUD"
+import { MemoryCapsulePanel } from "@/components/ui/MemoryCapsulePanel"
+import { ConstellationGuide } from "@/components/ui/ConstellationGuide"
+import { ConstellationPreview } from "@/components/ui/ConstellationPreview"
+import { ConstellationOverture } from "@/components/ui/ConstellationOverture"
+import { ShareSky } from "@/components/ui/ShareSky"
+import { StarWokeToast } from "@/components/ui/StarWokeToast"
 import { NavigationHUD } from "@/components/ui/NavigationHUD"
 import { InstallAppButton } from "@/components/ui/InstallAppButton"
 import { GrowthSimulator } from "@/components/ui/GrowthSimulator"
@@ -68,6 +75,11 @@ function ExperienceInner({ slug, config }: { slug?: string; config?: TenantConfi
   const magicActive     = useSceneStore((s) => s.magicActive)
   const setDailyMessage = useSceneStore((s) => s.setDailyMessage)
   const setActiveMoment = useSceneStore((s) => s.setActiveMoment)
+  const universeMode    = useSceneStore((s) => s.universeMode)
+
+  // While the camera is up with the constellation, everything that belongs to
+  // the rose steps out of the frame.
+  const atTheRose = universeMode === "rose"
 
   const queryClient     = useQueryClient()
 
@@ -164,7 +176,7 @@ function ExperienceInner({ slug, config }: { slug?: string; config?: TenantConfi
   }, [setMagicActive, setDomeLifted, setViewPreset, triggerBloom, queryClient, setRose, setDailyMessage, setFallenPetals, setActiveMoment])
 
   const startHold = useCallback(() => {
-    if (phase !== "IDLE" || magicActive) return
+    if (phase !== "IDLE" || magicActive || !atTheRose) return
     holdStartRef.current = performance.now()
     setIsHolding(true)
 
@@ -185,7 +197,7 @@ function ExperienceInner({ slug, config }: { slug?: string; config?: TenantConfi
       }
     }
     holdRafRef.current = requestAnimationFrame(tick)
-  }, [phase, magicActive, setHoldProgress, setIsHolding, runMagic])
+  }, [phase, magicActive, atTheRose, setHoldProgress, setIsHolding, runMagic])
 
   const endHold = useCallback(() => {
     if (!holdStartRef.current) return
@@ -228,6 +240,13 @@ function ExperienceInner({ slug, config }: { slug?: string; config?: TenantConfi
       <FinalDeathScene />
       <LettersPanel />
       <MemoryStarPanel />
+      <ConstellationHUD />
+      <MemoryCapsulePanel />
+      <ConstellationGuide />
+      <ConstellationPreview />
+      <ConstellationOverture />
+      <ShareSky />
+      <StarWokeToast />
       <GrowthSimulator />
       <MissedDayPreview />
       <MissYouButton />
@@ -237,7 +256,7 @@ function ExperienceInner({ slug, config }: { slug?: string; config?: TenantConfi
           and "I miss you" button leave free). Only while IDLE, so it can never
           sit over the intro or a cinematic — and it removes itself once the app
           is installed. On iPhone this is the ONLY way to get notifications. */}
-      {phase === "IDLE" && (
+      {phase === "IDLE" && atTheRose && (
         <InstallAppButton
           compact
           label="Add to home screen"
@@ -245,7 +264,7 @@ function ExperienceInner({ slug, config }: { slug?: string; config?: TenantConfi
         />
       )}
 
-      {phase === "IDLE" && <IdleHint />}
+      {phase === "IDLE" && atTheRose && <IdleHint />}
     </div>
   )
 }

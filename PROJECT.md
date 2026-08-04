@@ -28,6 +28,25 @@ correctly; partial refunds deliberately don't revoke.
 server-side after the gates. A public URL outlived expiry, refund and deletion — meaning the
 most personal content in the gift was never actually revocable.
 
+**The Memory Constellation.** Memories stopped being loose orbiting orbs and became a
+procedurally generated sky of 40–60 stars, unique to each gift and rebuilt from a seed rather
+than stored — no two couples can ever be given the same one. It hangs in the **same 3D world**
+as the rose, far above it; the camera flies up to it and back, with no second scene and no page
+change. Connections are the sky's minimum spanning tree, which is what guarantees no line ever
+crosses another.
+
+Around it: an **arrival cinematic** that shows the sky finished before fading back to the one
+star she has actually earned; a **first-visit guide**; a **notification** at the rose each time
+tending wakes a new star, which then pulses until she goes and looks; **share** a completed sky
+as a picture or a recorded clip; and a **growth preview** that walks the whole arc forward day
+by day so the progression can be proven without waiting months for it. See *Memory
+Constellation* below.
+
+**A CSS landmine, cleared.** An unlayered `* { padding: 0 }` in `globals.css` was silently
+beating Tailwind's `@layer utilities` and nulling **every** padding and margin utility in the
+app — 90 of them across 14 files. Panels looked merely cramped rather than broken, so it had
+gone unnoticed. See *Padding and margin utilities were dead app-wide*.
+
 **Legal + identity.** Real trader identity published (EU consumer law + GDPR controller),
 terms rewritten to describe the actual one-year model instead of the subscription language
 that was there before, and a refund clause backed by a consent step at checkout.
@@ -161,13 +180,27 @@ rose_state          -- single row (id = 00000000-0000-0000-0000-000000000001)
 
 daily_messages      -- 40 seeded love messages (day_number = null = pool)
 letters             -- 4 seeded unlockable letters (unlock at 7, 30, 100, 365 visits)
-memory_stars        -- player-created constellation points
+memory_stars        -- one memory capsule, bound to one star of one constellation
+  title, date, memory, photos
+  position_x/y/z      -- legacy: still drives the orbiting MemoryStarField
+  constellation_index -- which chapter (0 = the first sky)
+  slot_index          -- which generated star holds it; null = adopted into the
+                      --   earliest free slot (pre-constellation rows)
+  video_url, voice_url, song_url, location, quote
+  is_favorite         -- burns brighter
+  is_anniversary      -- carries a rose-coloured aura
 gallery_photos      -- photo gallery
 visit_log           -- every visit logged
 daily_videos        -- videos he uploads for her daily visits
 ```
 
 RLS is enabled on all tables with open `allow all` policies (single-user, no auth needed).
+
+**Migrations are applied by hand** — there is no Supabase CLI setup here and no
+`supabase/config.toml`, so `supabase db push` does not work. Paste the file into the project's
+SQL editor (or use the Supabase connector) and record it in the file header, as
+`rose-saas-migrations/*.sql` do. Two databases, two folders: `supabase/migrations/` →
+`gwjmiqjativwhsiwryqw`, `supabase/rose-saas-migrations/` → `fqosivbvqgjjfgfpfcbu`.
 
 ---
 
@@ -262,6 +295,14 @@ isHolding: boolean
 viewPreset: "close" | "wide" | "default" | null  // camera vantage preset
 viewTick: number                 // bumped on every setViewPreset call (triggers camera GSAP)
 magicActive: boolean             // true during the magic hold sequence (stars whirl, sparkles burst)
+
+// ── Memory Constellation ──
+universeMode: "rose" | "ascending" | "universe" | "descending"
+                                 // where the camera is in the one shared world
+revealTick: number               // bumped to animate the connection lines
+recenterTick: number             // bumped to re-frame the whole constellation
+activeSlot: number | null        // the constellation slot whose capsule is open
+igniting: boolean                // the completion sequence is playing
 ```
 
 ### Key Actions
@@ -275,6 +316,11 @@ setHoldProgress(0–1)         // drive hold ring
 setSimulationPetals(n)       // GrowthSimulator override
 setViewPreset(preset)        // glide camera to "close" | "wide" | "default"
 setMagicActive(bool)         // toggle magic hold sequence (sparkles + star whirl)
+setUniverseMode(mode)        // "ascending" starts the flight up; "descending" flies back
+triggerReveal()              // draw the constellation's connections, then let them fade
+triggerRecenter()            // re-frame the whole constellation (double tap)
+setActiveSlot(slot | null)   // open / close a memory capsule
+setIgniting(bool)            // the completion sequence (every star lights at once)
 ```
 
 ---
@@ -303,6 +349,10 @@ rose-app/
 │   │   ├── RoseDome.tsx           # dome + plinth + table texture + dome lift GSAP
 │   │   ├── RoseModel.tsx          # GLB loader, Rose.png texture (true colours), cursor tilt, bloom
 │   │   ├── MemoryStarField.tsx    # orbiting stars + magic whirl + newborn scale-in
+│   │   ├── Constellation.tsx      # the memory sky: stars, halos, reveal lines, sealed chapters
+│   │   ├── ConstellationCamera.tsx # the vertical flight rose ⇄ sky + free look up there
+│   │   ├── CosmicBackdrop.tsx     # nebulae (shader), distant stars, cosmic dust
+│   │   ├── constellationTextures.ts # shared canvas-drawn glow / flare sprites
 │   │   ├── MagicSparkles.tsx      # soft round particle burst during magic hold (NEW)
 │   │   ├── SceneLighting.tsx      # physically-based lights; Environment in own Suspense
 │   │   ├── PetalParticles.tsx     # physics petal drops (Rapier)
@@ -323,6 +373,10 @@ rose-app/
 │   │   ├── FinalDeathScene.tsx    # cinematic text reveal + personal letter
 │   │   ├── LettersPanel.tsx       # 4 unlockable letters (7/30/100/365 visit gates)
 │   │   ├── MemoryStarPanel.tsx    # list/create memory stars
+│   │   ├── ConstellationHUD.tsx   # sky HUD (name, reveal, back) + completion moment
+│   │   ├── ConstellationGuide.tsx # first-visit guide to the sky, once per gift
+│   │   ├── ConstellationPreview.tsx # walk the sky forward day by day (owner testing)
+│   │   ├── MemoryCapsulePanel.tsx # one star opened: read a capsule, or write one
 │   │   ├── GrowthSimulator.tsx    # "Preview growth" scrubber (bottom-left, IDLE only)
 │   │   └── Icons.tsx              # all SVG icons inline (no emoji, no icon library)
 │   │
@@ -332,6 +386,11 @@ rose-app/
 ├── lib/
 │   ├── store/
 │   │   └── sceneStore.ts
+│   ├── constellation/
+│   │   ├── random.ts              # FNV-1a hash + mulberry32 seeded PRNG
+│   │   ├── generate.ts            # the procedural generator (spine, branches, EMST)
+│   │   ├── names.ts               # the poetic name a completed sky earns
+│   │   └── useConstellation.ts    # binds stored memories → slots; unlocks; chapters
 │   ├── animation/
 │   │   ├── timelines.ts           # CAMERA_POSITIONS, TIMELINE_DURATIONS, BLOOM_INTENSITIES
 │   │   └── easings.ts             # EASE_CINEMATIC, EASE_SPRING, TRANSITION_PANEL etc.
@@ -396,6 +455,21 @@ setMagicActive(true) + setDomeLifted(true) + setViewPreset("close") + triggerBlo
 - Rose blooms, spins 360°, emissive flash
 - A new memory star scales in from zero and joins the constellation
 - Everything settles back to normal after ~4 seconds
+
+### 1b. Universe (the flight up to the constellation)
+
+**Where:** `NavigationHUD.tsx` → **Universe**, the fourth item in the nav pill. It sits there
+rather than floating at the bottom of the screen, where a real gift already stacks the "I miss
+you" button and its hint. While a cinematic owns the camera (emergence or the magic hold) it
+renders dimmed and disabled instead of vanishing, so the way in is visible before it is usable.
+
+Sets `universeMode: "ascending"`. The camera climbs ~2.8s through the same world to the sky
+above the rose, then `ConstellationCamera` hands over to free look. Everything belonging to
+the rose — the nav pill, view controls, "I miss you", the preview buttons, the idle hint —
+steps out of frame while `universeMode !== "rose"`. Coming back is the same move reversed.
+
+Up there: **drag** to rotate, **scroll/pinch** to zoom, **double tap** to re-frame, **tap a
+star** to open its capsule, **Reveal constellation** to draw the connections.
 
 ### 2. Tend Rose (Daily Care — via HUD)
 
@@ -523,7 +597,10 @@ Three.js 0.169+ uses physically-based light units (candela/lux). Legacy intensit
 
 **Critical:** Do NOT raise the neutral fills above ~20 — it blows the bloom white and drowns the green leaves.
 
-### Constellation
+### Orbiting Memory Stars (`MemoryStarField.tsx`)
+
+Distinct from the **Memory Constellation** below — these are the small stars that circle the
+rose itself at close range. They predate the constellation and still read `position_x/y/z`.
 
 Memory stars orbit the rose using deterministic parameters derived from their database ID hash:
 - `radius`: 2.2–5.0 units
@@ -547,7 +624,10 @@ Gold lines connect consecutive stars (`THREE.LineSegments`, `#c9a84c` at 25% opa
 ### PostProcessing (`PostProcessing.tsx`)
 
 - **Bloom** (intensity: idle=0.45, caring=1.2, revival=2.0, dead=0.25; luminanceThreshold 0.9)
-- **Vignette** (darkness 0.55)
+- **In the sky** (`universeMode !== "rose"`): intensity 1.05 (1.55 while igniting) and
+  luminanceThreshold drops to 0.42 — up there the stars *are* the image, and that soft halo is
+  what makes a point of light read as a star rather than a dot
+- **Vignette** (darkness 0.55; 0.72 in the sky)
 - DepthOfField **removed** — any `focusDistance ≈ 0` blacks out the entire frame
 - ChromaticAberration **removed** — was blacking out on some hardware
 - No `ToneMapping` effect — renderer handles ACES at `toneMappingExposure: 1.05`
@@ -584,6 +664,232 @@ The entire scene was previously wrapped in ONE `<Suspense fallback={null}>`. A s
 ```
 
 **Font requirement:** `public/fonts/Cormorant-Italic.woff` MUST exist. A 404 causes troika to suspend the MemoryStarField Suspense boundary indefinitely (stars never appear). troika accepts `.woff` and `.ttf` but NOT `.woff2`.
+
+---
+
+## Memory Constellation
+
+A chapter of the relationship, drawn as a sky of 40–60 stars. Every gift's constellation is
+unique, none of them are real constellations, and **none of the geometry is stored** — it is
+regenerated from a seed, so a couple's sky is permanent for free and no two gifts can collide.
+
+### Generation (`lib/constellation/generate.ts`)
+
+Seeded by `tenantSlug + chapterIndex` (the legacy personal gift uses the seed
+`enchanted-rose`). Pure and deterministic: same arguments, same sky, forever. Results are
+memoised in a module-level cache because four components ask for the same sky each render.
+
+The shape is grown, not sampled:
+
+1. **A spine** — a wandering curve of 4–6 Catmull-Rom control points with a bounded turn rate
+   (≤ ~55°, biased consistently one way). Bounding the turn is what stops the silhouette
+   curling back into itself and gives it an unhurried, drawn-by-hand flow.
+2. **2–4 branches** split off at a real angle (0.55–1.25 rad), their roots kept ≥ 0.16 apart
+   along the spine so the shape doesn't sprout everything from one spot.
+3. **3–5 clusters** of 2–4 satellites — pockets of density against the open space.
+4. **2–4 lonely stars** thrown outward into the negative space.
+
+Six candidate silhouettes are grown and scored on **proportion** (aspect near 0.62),
+**airiness** (~30% of a 9×9 grid occupied — the rest is the negative space) and **balance**
+(mass not piled into one corner). Best wins; the loop is fixed and seeded, so "best" is
+decided identically on every device. Stars closer than `0.052` normalized units are pruned so
+every star stays its own light.
+
+### Connections are a minimum spanning tree — and that's load-bearing
+
+Edges are the **Euclidean minimum spanning tree** of the stars as seen head-on (Prim's, on the
+XY projection). A planar EMST provably contains **no crossing edges**, so "Reveal
+Constellation" can never draw a tangle over itself — no geometric special-casing needed.
+
+Prim's *insertion order from the root* doubles as the **unlock order**, so the sky always
+grows outward contiguously from its heart rather than lighting up scattered points.
+
+> Verified across 21 constellations from 7 seeds: 40–60 stars each, **zero crossings**,
+> deterministic, and distinct per seed and per chapter.
+
+### The sky lives in the rose's world
+
+`UNIVERSE_Y = 28`, `CONSTELLATION_SCALE = 6.4`. There is **no second scene and no route
+change** — the constellation is a group in the same `<Canvas>`, hidden while
+`universeMode === "rose"` so 60 stars cost nothing down at the flower.
+
+`ConstellationCamera.tsx` owns the journey. `CameraRig` and `CameraControls` both bail out
+while `universeMode !== "rose"` so nothing fights over the camera.
+
+| | |
+|---|---|
+| Up | 2.8s, `power2.inOut`. The **gaze lags** the position by 18% — the rose stays in frame a beat, then slips away beneath her as she rises |
+| Down | 2.5s. The gaze **leads**, so the flower is already waiting when she arrives |
+| Framing | `(radius × SCALE / tan(fov/2)) × 1.12`, clamped 9–24 |
+| Free look | OrbitControls, damped, azimuth ±1.05 and polar ±0.72 — she can look around her sky but can never tumble it or lose it behind her |
+
+The flight effect depends on `universeMode` alone, reading framing through a ref — otherwise a
+background refetch of the memories would restart the flight halfway up.
+
+### Unlock progression
+
+`1 + rose.totalVisits` stars are awake, minus those consumed by sealed chapters. One star is
+lit on day one; every tending of the rose wakes one more, in the tree's growth order.
+
+| State | Look |
+|---|---|
+| Asleep | `#6f7fa8`, luminance 0.13 — dim, but the silhouette hints at what's coming |
+| Awake, empty | `#f3f6ff`, 0.5 |
+| Filled | `#ffd48a`, 1.0 — a permanent warm glow |
+| Favourite | `#ffe6b0` at 1.22× |
+| Anniversary | `#ffa8c8` plus a persistent coloured aura sprite |
+
+A star that has just woken or just been filled **flares** (a half-sine burst decaying over
+2.2s) and settles. Each star drifts on its own small path and shimmers on its own phase.
+
+### Reveal
+
+One `<lineSegments>` for the whole graph — a single draw call. Each edge waits its turn by
+its depth from the root, then draws by lerping its far endpoint outward (~2s), holds 1.7s,
+fades 1.4s. Edges touching a sleeping star render at 22% in cold blue-white: she can see the
+shape she is working toward without it shouting. Additive blending means per-vertex RGB
+doubles as alpha.
+
+### Completion and the long term
+
+When every star is filled, the sky ignites, the constellation takes one slow breath, the
+connections come back one final time and it receives its **earned poetic name**
+(`lib/constellation/names.ts` — four sentence shapes, seeded). Their own song fades in
+underneath if the gift has one.
+
+A finished chapter is only **sealed** once the next one has been started — otherwise the
+moment a couple wrote their last memory the sky would blink to an empty one, and that moment
+is the whole point. Sealed chapters hang nearby at 66% scale and 42% brightness, placed on the
+golden angle so they never line up in a row. The universe grows sideways into the dark.
+
+### The overture (`ConstellationOverture.tsx` + the camera)
+
+The arrival cinematic — the constellation's answer to the rose's emergence. ~12.3s, and while
+it runs the sky is shown **finished**: every star warm gold, every connection drawn. The sky
+assembles itself in three movements before it is joined up — stars light **one after another**
+along the constellation's growth order (4.2s), then **all of them bloom together** (1.0s), and
+only then do the **connections draw** (from 5.2s). Timings live at the top of
+`Constellation.tsx`. It is a
+vision of what the two of them are building, never a state she has earned, and it fades back
+to the single lit star before she is handed the controls.
+
+Four movements, choreographed in `ConstellationCamera` as a spherical orbit (azimuth, polar,
+radius) tweened by GSAP:
+
+| Movement | Shot |
+|---|---|
+| 3.4s | Falls in from high and far out, until the shape reads as a whole |
+| 3.2s | Drifts across its face — the depth in the sky separates here |
+| 2.1s | Presses in close, so near stars sweep past far ones |
+| 3.0s | Pulls back to the resting frame |
+
+The vision is released one beat *before* the camera settles, so the last thing that happens is
+the real sky arriving rather than the camera stopping.
+
+**Captions are driven by the camera, not a clock.** The timeline emits `overtureBeat` via GSAP
+`.call()`, and the overlay maps beat → line. Wall-clock timers would drift out of sync with the
+shot on a slow device or a throttled tab. They crossfade *without* `mode="wait"` — an incoming
+line must never be held hostage by the outgoing one's exit animation.
+
+Plays once per gift (`rose_sky_overture_v1:<seed>`), marked watched the moment it starts so an
+interrupted first visit doesn't replay forever. It is a **permanent feature**, not something
+spent on the first visit: **The finished sky** in the sky HUD replays it any time. Skip is
+always available; skipping mid-flight eases the camera to the resting frame so control is never
+handed back at a strange angle.
+
+While it runs, OrbitControls stands down, and the guide, growth preview, sky HUD and double-tap
+recentre all step aside.
+
+**`visionActive` never unlocks anything.** It is a render flag read only inside the frame loop:
+luminance follows the sweep, and colour is lerped toward the warm gold and back. Deliberately
+*not* part of the star list's memo — otherwise toggling it would reallocate all 60 stars and
+fire a false "just changed state" flare on every one of them. The moment it clears, the real
+unlock state is what remains, and sleeping stars settle back to pale placeholders.
+
+### A star waking (`useNewStars.ts`, `StarWokeToast.tsx`)
+
+Tending the rose wakes a star, and that is announced **at the rose** — because that is where
+the waking happens. A toast under the nav reads *"A new star has woken in your sky."* and
+carries **Look up**, which starts the flight. It retires after 9s; the stars themselves keep
+**pulsing** until she actually goes and looks.
+
+The count of lifetime unlocks she has already seen lives in
+`rose_sky_seen_unlocks:<seed>`, **seeded to the current count** on a device that has never seen
+this gift — so an existing couple is never told that thirty stars are new. Arriving in the sky
+marks them seen after 1.2s. The growth preview is excluded: nothing simulated has really woken.
+
+### Sharing a finished sky (`ShareSky.tsx`, `captureSky.ts`)
+
+Offered once a constellation is complete.
+
+- **Picture** — `toBlob` straight off the canvas. This is why `SceneRoot` sets
+  `preserveDrawingBuffer: true`; without it the buffer is cleared and the capture comes back
+  empty.
+- **Clip** — `captureStream(30)` into a `MediaRecorder` while the overture is replayed, so what
+  leaves the app is the cinematic rather than a static frame (~13.4s). The container is chosen
+  from what the browser actually supports (mp4/avc1 → vp9 → vp8 → webm); if none is, the option
+  is hidden rather than failing.
+- Both go through the OS share sheet where `canShare({ files })` allows it, and fall back to a
+  download. A cancelled share sheet is **not** treated as a failure, so it doesn't then force a
+  download the user just declined.
+- The canvas is found by picking the **largest** on the page, not the first — other canvases
+  exist and grabbing the wrong one would silently capture nothing.
+
+Deliberately available inside the growth preview too, so the flow can be checked before launch;
+the `Preview · day N` badge sits in the captured frame, so a simulated sky labels itself.
+
+### First arrival (`ConstellationGuide.tsx`)
+
+Four short cards, shown **once per gift**, 1.4s after the flight lands. They sit low so the
+constellation is never covered, the sky stays draggable behind them, and `Skip` ends it at any
+point. Marked read in `localStorage` under `rose_sky_guide_v1:<seed>`; leaving the sky without
+finishing does NOT mark it, so an interrupted first visit still gets the guide next time.
+
+While it is up, `guideActive` in the store tells the sky HUD to step aside rather than stack
+two pills at the bottom of the screen.
+
+### Growth preview (`ConstellationPreview.tsx`)
+
+Proving the progression works shouldn't cost a hundred days of waiting. **Preview growth**
+(bottom-left in the sky) replays the whole arc as if the rose were tended once a day.
+
+Driven by `previewDays` in the store, which stands in for `rose.totalVisits`. When it is not
+null, `useConstellation` takes an entirely separate path (`previewView`) that consults **no
+stored row and writes nothing** — closing the panel restores the real sky untouched. A gold
+`Preview · day N` badge sits top-right the whole time so a simulated sky can never be mistaken
+for the real one.
+
+- **Scrub or Play** — one simulated day per 260ms. Stars wake in the constellation's own order.
+- **Write a memory each day** (on by default) fills each star as it wakes. This is the only way
+  chapters ever complete, so it is also the only way to preview the completion sequence and the
+  chapters after the first. With it off, stars wake but stay empty and the sky stops at chapter one.
+- **Playback holds on a completed sky.** Completion lasts a single simulated day before the
+  chapter seals, so Play would otherwise blow straight past the moment. It stops there, the
+  transport becomes **Next chapter**, and pressing it carries on into the following sky.
+- Favourites and anniversaries are seeded deterministically (every 7th and 13th star) so those
+  two variants actually show up to be checked.
+
+Verified against the `enchanted-rose` seed: day 0 → 1 of 58; day 57 → complete, ignites, earns
+*Infinite Garden*; day 58 → Chapter Two, 1 of 49, one chapter sealed. Growth is monotonic and
+in range across every day of the first four chapters.
+
+### What keeps it cheap
+
+- The star frame loop **returns immediately while the camera is at the rose**. The sky is
+  hidden there, and it was otherwise updating 60 stars every frame for nobody.
+- **Sealed chapters render as a single additive point cloud**, not ~100 meshes and sprites
+  each. They are distant, dim and untouchable, so per-star materials would buy nothing visible.
+  Only the most recent `MAX_VISIBLE_ARCHIVES` (5) are drawn.
+- Generation is memoised in a module-level cache; several components ask for the same sky on
+  the same render.
+- The vision is a frame-loop concern, so it never invalidates the star list.
+
+### Binding memories to slots (`useConstellation.ts`)
+
+Rows carry their own `slot_index`. Rows written **before** the constellation existed have a
+null slot and are adopted into the earliest free slot in unlock order, oldest memory first —
+so nothing anyone ever wrote is orphaned by the upgrade. Overflow carries into the next
+chapter rather than being dropped.
 
 ---
 
@@ -726,6 +1032,25 @@ The **public** VAPID key is served to the browser on demand; the **private** key
 ---
 
 ## Known Issues & Notes
+
+### Padding and margin utilities were dead app-wide (fixed)
+
+`app/globals.css` had this as a bare, **unlayered** rule:
+
+```css
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+```
+
+Unlayered CSS outranks *every* layered rule, and Tailwind v4 puts all utilities in
+`@layer utilities` — so this silently beat all 90 `p-*` / `m-*` classes across 14 files.
+`gap-*` still worked, which is why it went unnoticed: panels looked merely cramped rather than
+obviously broken. The memory capsule's header computed `padding: 0` against its `px-7 pt-7`.
+
+It now lives inside `@layer base`. **Keep it there** — moving it back out re-breaks every
+padding utility in the app at once.
+
+Watch for `*/` inside CSS comments too (e.g. writing `p-*/m-*`); it terminates the comment
+early and corrupts the following rule.
 
 ### SceneErrorBoundary
 `components/scene/SceneErrorBoundary.tsx` wraps `SceneRoot`. If any 3D component throws (GLB load error, Three.js crash, unknown viewPreset key), the canvas silently disappears but all UI layers remain functional. **Always guard `VIEW_PRESETS[preset]` — an unknown key returns `undefined` and crashes the whole Canvas.**

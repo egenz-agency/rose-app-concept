@@ -42,6 +42,16 @@ export interface Database {
           position_y: number
           position_z: number
           created_at: string
+          // Memory Constellation (migration 006 / rose-saas 008)
+          constellation_index: number
+          slot_index: number | null
+          video_url: string | null
+          voice_url: string | null
+          song_url: string | null
+          location: string | null
+          quote: string | null
+          is_favorite: boolean
+          is_anniversary: boolean
         }
         Insert: Omit<Database["public"]["Tables"]["memory_stars"]["Row"], "id" | "created_at">
         Update: Partial<Database["public"]["Tables"]["memory_stars"]["Row"]>

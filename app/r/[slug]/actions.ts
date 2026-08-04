@@ -17,6 +17,7 @@ import {
   isGiftRole,
   type GiftRole,
 } from "@/lib/server/pushQueries"
+import type { MemoryCapsuleInput } from "@/lib/supabase/starColumns"
 import { getAccessibleTenant } from "@/lib/security/giftAccess"
 import { cleanText, cleanDate, cleanHttpUrl, cleanInt, LIMITS } from "@/lib/security/validate"
 import { enforceRateLimit, clientIp } from "@/lib/security/ratelimit"
@@ -63,19 +64,31 @@ export async function fetchMemoryStarsAction(slug: string) {
 
 export async function createMemoryStarAction(
   slug: string,
-  star: { title: string; date: string; memory: string; photos: string[]; position: [number, number, number] }
+  star: MemoryCapsuleInput
 ) {
   const id = await tenantIdFor(slug)
   await enforceRateLimit(`star:${id}:${await clientIp()}`, 12, 3600) // 12/hour per IP
   const photos = Array.isArray(star?.photos)
     ? (star.photos.slice(0, LIMITS.starPhotos).map((u) => cleanHttpUrl(u)).filter(Boolean) as string[])
     : []
-  const clean = {
+  const clean: MemoryCapsuleInput = {
     title: cleanText(star?.title, LIMITS.title) ?? "A memory",
     date: cleanDate(star?.date) ?? new Date().toISOString().slice(0, 10),
     memory: cleanText(star?.memory, LIMITS.starMemory) ?? "",
     photos,
     position: sanitizePosition(star?.position),
+    // ── Memory Constellation capsule ──
+    // The slot binds this memory to one star of one generated constellation.
+    // Both are bounded here: a crafted value can't address an arbitrary row.
+    constellationIndex: cleanInt(star?.constellationIndex, 0, 999) ?? 0,
+    slotIndex: cleanInt(star?.slotIndex, 0, 59),
+    videoUrl: cleanHttpUrl(star?.videoUrl),
+    voiceUrl: cleanHttpUrl(star?.voiceUrl),
+    songUrl: cleanHttpUrl(star?.songUrl),
+    location: cleanText(star?.location, LIMITS.location),
+    quote: cleanText(star?.quote, LIMITS.note),
+    isFavorite: star?.isFavorite === true,
+    isAnniversary: star?.isAnniversary === true,
   }
   return srvCreateMemoryStar(id, clean)
 }

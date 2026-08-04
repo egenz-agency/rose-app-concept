@@ -19,6 +19,7 @@ const BATCH_MS = 3500
 export function MissYouButton() {
   const phase = useSceneStore((s) => s.phase)
   const slug = useSceneStore((s) => s.tenantSlug)
+  const universeMode = useSceneStore((s) => s.universeMode)
 
   const [mounted, setMounted] = useState(false)
   const [supported, setSupported] = useState(true)
@@ -96,8 +97,9 @@ export function MissYouButton() {
     }
   }
 
-  // Only on a real gift page (needs a slug), while idle, and where push can work.
-  if (!mounted || !supported || !slug || phase !== "IDLE") return null
+  // Only on a real gift page (needs a slug), while idle, down at the rose, and
+  // where push can work.
+  if (!mounted || !supported || !slug || phase !== "IDLE" || universeMode !== "rose") return null
 
   return (
     <>

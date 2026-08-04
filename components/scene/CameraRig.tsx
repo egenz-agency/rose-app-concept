@@ -12,6 +12,7 @@ export function CameraRig() {
   const isEmergence  = useSceneStore((s) => s.isEmergence)
   const setIsEmergence = useSceneStore((s) => s.setIsEmergence)
   const setMagicActive = useSceneStore((s) => s.setMagicActive)
+  const universeMode   = useSceneStore((s) => s.universeMode)
 
   // Where to look during scripted phases — trained on the bloom (top of rose)
   const lookTarget = useRef(new THREE.Vector3(0, 1.1, 0))
@@ -19,6 +20,7 @@ export function CameraRig() {
   // ── Normal phase transitions ─────────────────────────────────────
   useEffect(() => {
     if (isEmergence) return   // emergence owns the camera while active
+    if (universeMode !== "rose") return   // the constellation journey owns it
     const pos = CAMERA_POSITIONS
     const animateTo = (target: { x: number; y: number; z: number }, dur: number, ease: string) =>
       gsap.to(camera.position, { x: target.x, y: target.y, z: target.z, duration: dur, ease })
@@ -38,7 +40,7 @@ export function CameraRig() {
     } else if (phase === "FINAL_DEATH") {
       animateTo(pos.final_death, TIMELINE_DURATIONS.final_death, "power4.inOut")
     }
-  }, [phase, isEmergence, camera])
+  }, [phase, isEmergence, universeMode, camera])
 
   // ── Emergence cinematic — helical orbit, bottom → top, held CLOSE ─────
   // The camera circles around the rose at a tight radius while spiralling up
@@ -86,6 +88,9 @@ export function CameraRig() {
 
   // ── Per-frame look-at ───────────────────────────────────────────
   useFrame(() => {
+    // Once the camera has left for the constellation, ConstellationCamera is the
+    // only thing allowed to aim it — including on the way up and back down.
+    if (universeMode !== "rose") return
     // During emergence or any scripted phase, keep the camera trained on the rose
     if (phase === "IDLE" || phase === "INSTRUCTIONS") {
       if (!isEmergence) return   // OrbitControls owns the camera in normal IDLE
